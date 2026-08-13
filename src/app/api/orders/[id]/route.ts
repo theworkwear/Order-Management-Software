@@ -1,0 +1,180 @@
+// ============================================
+// Single Order API — GET/PATCH
+// ============================================
+import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { fetchAllOrders, updateOrderStatus, updateOrderFields, batchUpdateCells } from '@/lib/google/sheets';
+import { OrderStatus, COLUMN_MAP, getProductColumnIndex } from '@/lib/types/order';
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const accessToken = (session as any)?.accessToken;
+    const { id } = await params;
+    const spreadsheetId = process.env.GOOGLE_SPREADSHEET_ID!;
+    const sheetName = process.env.GOOGLE_SHEET_NAME || 'Sheet1';
+
+    const orders = await fetchAllOrders(accessToken, spreadsheetId, sheetName);
+    const order = orders.find(o => o.orderNumber === id || o.rowIndex.toString() === id);
+
+    if (!order) {
+      return NextResponse.json({ error: 'Order not found' }, { status: 404 });
+    }
+
+    return NextResponse.json({ order });
+  } catch (error: any) {
+    console.error('Order GET error:', error);
+    return NextResponse.json({ error: 'Failed to fetch order' }, { status: 500 });
+  }
+}
+
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const accessToken = (session as any)?.accessToken;
+    const { id } = await params;
+    const body = await request.json();
+    const spreadsheetId = process.env.GOOGLE_SPREADSHEET_ID!;
+    const sheetName = process.env.GOOGLE_SHEET_NAME || 'Sheet1';
+
+    // First find the order to get its row number
+    const orders = await fetchAllOrders(accessToken, spreadsheetId, sheetName);
+    const order = orders.find(o => o.orderNumber === id || o.rowIndex.toString() === id);
+
+    if (!order) {
+      return NextResponse.json({ error: 'Order not found' }, { status: 404 });
+    }
+
+    const userRole = (session as any)?.role || (session?.user as any)?.role || 'admin';
+    const isDigitizerRole = userRole === 'digitizer';
+
+    const updates: { row: number; col: number; value: string }[] = [];
+    let isDigitizedEvent = false;
+
+    // Handle status change
+    if (body.status && body.status !== order.status) {
+      updates.push({ row: order.rowIndex, col: COLUMN_MAP.status, value: body.status });
+      
+      // If status is "Digitized", update Processed At
+      if (body.status === 'Digitized') {
+        isDigitizedEvent = true;
+        const now = new Date().toLocaleString('en-AU', {
+          year: 'numeric', month: '2-digit', day: '2-digit',
+          hour: '2-digit', minute: '2-digit', second: '2-digit',
+          hour12: false,
+        });
+        updates.push({ row: order.rowIndex, col: COLUMN_MAP.processedAt, value: now });
+      }
+    }
+
+    // Handle core field updates (Blocked for digitizers)
+    if (!isDigitizerRole) {
+      const fieldMap: Record<string, number> = {
+        orderNumber: COLUMN_MAP.orderNumber,
+        orderDate: COLUMN_MAP.orderDate,
+        customerName: COLUMN_MAP.customerName,
+        customerEmail: COLUMN_MAP.customerEmail,
+        customerPhone: COLUMN_MAP.customerPhone,
+        shippingAddress: COLUMN_MAP.shippingAddress,
+        total: COLUMN_MAP.total,
+        orderFolder: COLUMN_MAP.orderFolder,
+        digitizedFolder: COLUMN_MAP.digitizedFolder,
+        orderEmail: COLUMN_MAP.orderEmail,
+        processedAt: COLUMN_MAP.processedAt,
+      };
+
+      for (const [field, colIdx] of Object.entries(fieldMap)) {
+        if (body[field] !== undefined && body[field] !== (order as any)[field]) {
+          updates.push({ row: order.rowIndex, col: colIdx, value: body[field] });
+        }
+      }
+
+      // Handle product updates (Blocked for digitizers)
+      if (body.products && Array.isArray(body.products)) {
+        if (body.replaceAllProducts) {
+          // Replace all 10 product slots with updated list (clearing unused slots)
+          for (let pIdx = 1; pIdx <= COLUMN_MAP.maxProducts; pIdx++) {
+            const prod = body.products[pIdx - 1];
+            const values = prod ? [
+              prod.name || '',
+              prod.productCode || '',
+              prod.qty || '',
+              prod.size || '',
+              prod.colour || '',
+              prod.emb || ''
+            ] : ['', '', '', '', '', ''];
+
+            [0, 1, 2, 3, 4, 5].forEach((offset, idx) => {
+              updates.push({
+                row: order.rowIndex,
+                col: getProductColumnIndex(pIdx, offset),
+                value: values[idx],
+              });
+            });
+          }
+        } else {
+          // Patch specific products by index
+          for (const product of body.products) {
+            if (product.index >= 1 && product.index <= 10) {
+              const fields = ['name', 'productCode', 'qty', 'size', 'colour', 'emb'];
+              const offsets = [0, 1, 2, 3, 4, 5];
+              
+              fields.forEach((field, offsetIdx) => {
+                if (product[field] !== undefined) {
+                  updates.push({
+                    row: order.rowIndex,
+                    col: getProductColumnIndex(product.index, offsets[offsetIdx]),
+                    value: product[field],
+                  });
+                }
+              });
+            }
+          }
+        }
+      }
+    }
+
+
+    if (updates.length === 0) {
+      return NextResponse.json({ message: 'No changes to save' });
+    }
+
+    // Batch update Google Sheets
+    await batchUpdateCells(accessToken, spreadsheetId, sheetName, updates);
+
+    // Trigger notification if order was marked Digitized
+    if (isDigitizedEvent) {
+      const { addNotification } = await import('@/lib/store/notifications');
+      addNotification({
+        title: `Order #${order.orderNumber} Digitized`,
+        message: `Order #${order.orderNumber} was marked as Digitized by ${session.user?.email || 'Digitizer'}.`,
+        orderNumber: order.orderNumber,
+        type: 'digitized',
+        byUser: session.user?.email || undefined,
+      });
+    }
+
+    return NextResponse.json({ 
+      message: 'Order updated successfully',
+      updatedFields: updates.length,
+    });
+  } catch (error: any) {
+    console.error('Order PATCH error:', error);
+    return NextResponse.json(
+      { error: 'Failed to update order. Changes could not be saved.' },
+      { status: 500 }
+    );
+
+  }
+}

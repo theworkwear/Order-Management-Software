@@ -1,0 +1,62 @@
+[
+  {
+    "id": "notif-1786600619828-wvoom",
+    "title": "Order #483307 Digitized",
+    "message": "Order #483307 was marked as Digitized by admin@theworkwear.com.",
+    "orderNumber": "483307",
+    "createdAt": "2026-08-13T05:56:59.828Z",
+    "read": true,
+    "type": "digitized",
+    "byUser": "admin@theworkwear.com"
+  },
+  {
+    "id": "notif-1786523602172-byw7w",
+    "title": "Order #483307 Digitized",
+    "message": "Order #483307 was marked as Digitized by digitizer@theworkwear.com.",
+    "orderNumber": "483307",
+    "createdAt": "2026-08-12T08:33:22.172Z",
+    "read": true,
+    "type": "digitized",
+    "byUser": "digitizer@theworkwear.com"
+  },
+  {
+    "id": "notif-1786517475764-ou6ji",
+    "title": "Order #363 Digitized",
+    "message": "Order #363 was marked as Digitized by admin@theworkwear.com.",
+    "orderNumber": "363",
+    "createdAt": "2026-08-12T06:51:15.764Z",
+    "read": true,
+    "type": "digitized",
+    "byUser": "admin@theworkwear.com"
+  },
+  {
+    "id": "notif-1786429231026-e1n42",
+    "title": "Order #486579 Digitized",
+    "message": "Order #486579 was marked as Digitized by digitizer@theworkwear.com.",
+    "orderNumber": "486579",
+    "createdAt": "2026-08-11T06:20:31.027Z",
+    "read": true,
+    "type": "digitized",
+    "byUser": "digitizer@theworkwear.com"
+  },
+  {
+    "id": "notif-1786428619747-zvsnf",
+    "title": "Order #484520 Digitized",
+    "message": "Order #484520 was marked as Digitized by digitizer@theworkwear.com.",
+    "orderNumber": "484520",
+    "createdAt": "2026-08-11T06:10:19.747Z",
+    "read": true,
+    "type": "digitized",
+    "byUser": "digitizer@theworkwear.com"
+  },
+  {
+    "id": "notif-demo-1",
+    "title": "Order Digitized",
+    "message": "Order #486579 has been marked as Digitized by Digitizer.",
+    "orderNumber": "486579",
+    "createdAt": "2026-08-11T05:50:21.603Z",
+    "read": true,
+    "type": "digitized",
+    "byUser": "digitizer@theworkwear.com"
+  }
+]
