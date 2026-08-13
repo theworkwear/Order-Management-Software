@@ -9,12 +9,14 @@ import { google } from 'googleapis';
 
 function getDriveAuth() {
   if (process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL && process.env.GOOGLE_PRIVATE_KEY) {
-    let key = process.env.GOOGLE_PRIVATE_KEY;
-    if (key.includes('\\n')) {
-      key = key.replace(/\\n/g, '\n');
+    let key = process.env.GOOGLE_PRIVATE_KEY.trim();
+    if ((key.startsWith('"') && key.endsWith('"')) || (key.startsWith("'") && key.endsWith("'"))) {
+      key = key.slice(1, -1).trim();
     }
+    key = key.replace(/\\n/g, '\n');
+
     return new google.auth.JWT({
-      email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+      email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL.trim(),
       key,
       scopes: [
         'https://www.googleapis.com/auth/drive.readonly',

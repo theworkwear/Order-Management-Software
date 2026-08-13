@@ -1,6 +1,6 @@
 // ============================================
-// Google Drive Images API
-// Lists images from a Drive folder and returns viewable/downloadable URLs
+// Google Drive Images & Files API
+// Lists files from a Drive folder and returns viewable/downloadable URLs
 // ============================================
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
@@ -10,12 +10,14 @@ import { google } from 'googleapis';
 function getDriveAuth() {
   // Service Account credentials
   if (process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL && process.env.GOOGLE_PRIVATE_KEY) {
-    let key = process.env.GOOGLE_PRIVATE_KEY;
-    if (key.includes('\\n')) {
-      key = key.replace(/\\n/g, '\n');
+    let key = process.env.GOOGLE_PRIVATE_KEY.trim();
+    if ((key.startsWith('"') && key.endsWith('"')) || (key.startsWith("'") && key.endsWith("'"))) {
+      key = key.slice(1, -1).trim();
     }
+    key = key.replace(/\\n/g, '\n');
+
     return new google.auth.JWT({
-      email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+      email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL.trim(),
       key,
       scopes: [
         'https://www.googleapis.com/auth/drive.readonly',
@@ -110,8 +112,8 @@ export async function GET(request: NextRequest) {
 
     const allMainItems = mainResponse.data.files || [];
 
-    // Filter main folder images (Customer Artwork)
-    const artworkFiles = allMainItems.filter(f => f.mimeType?.includes('image/'));
+    // All files in main folder (excluding subfolders) are Customer Artwork
+    const artworkFiles = allMainItems.filter(f => f.mimeType !== 'application/vnd.google-apps.folder');
     
     // Look for subfolders (e.g. "Digitized Files" or "Digitized")
     const digitizedSubfolder = allMainItems.find(
