@@ -1,9 +1,12 @@
-// ============================================
-// NextAuth Configuration
-// ============================================
 import NextAuth, { type AuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import GoogleProvider from 'next-auth/providers/google';
+
+if (!process.env.NEXTAUTH_URL || process.env.NEXTAUTH_URL.trim() === '') {
+  process.env.NEXTAUTH_URL = process.env.VERCEL_URL
+    ? `https://${process.env.VERCEL_URL}`
+    : 'http://localhost:3000';
+}
 
 export const authOptions: AuthOptions = {
   providers: [

@@ -158,10 +158,25 @@ export default function Sidebar({ mobileOpen = false, onCloseMobile }: SidebarPr
           {/* Collapse Toggle (Desktop only) */}
           <button
             onClick={() => setCollapsed(!collapsed)}
-            className="hidden md:flex w-full items-center justify-center py-2 text-sidebar-text hover:text-slate-200 transition-colors mt-2"
+            className="hidden md:flex w-full items-center justify-center py-2 text-sidebar-text hover:text-slate-200 transition-colors mt-1"
           >
             {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
           </button>
+
+          {/* Developer Credit Branding */}
+          {!collapsed && (
+            <div className="pt-2 text-center border-t border-sidebar-border/40">
+              <a
+                href="https://remotelyavailable.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[10px] text-slate-500 hover:text-slate-300 transition-colors tracking-wide inline-flex items-center gap-1"
+              >
+                <span>Built by</span>
+                <span className="font-medium text-slate-400 hover:text-blue-400 underline underline-offset-2">remotelyavailable.com</span>
+              </a>
+            </div>
+          )}
         </div>
       </aside>
     </>
