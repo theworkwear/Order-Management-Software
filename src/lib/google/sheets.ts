@@ -27,13 +27,18 @@ function getAuth(accessToken?: string) {
 
   // 3. Individual Service Account Email & Private Key
   if (process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL && process.env.GOOGLE_PRIVATE_KEY) {
-    let key = process.env.GOOGLE_PRIVATE_KEY;
-    // Unescape escaped newlines if passed as env string
-    if (key.includes('\\n')) {
-      key = key.replace(/\\n/g, '\n');
+    let key = process.env.GOOGLE_PRIVATE_KEY.trim();
+    
+    // Strip accidental wrapping quotes from Vercel UI copy/paste
+    if ((key.startsWith('"') && key.endsWith('"')) || (key.startsWith("'") && key.endsWith("'"))) {
+      key = key.slice(1, -1).trim();
     }
+    
+    // Replace escaped newlines with actual newlines
+    key = key.replace(/\\n/g, '\n');
+
     return new google.auth.JWT({
-      email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+      email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL.trim(),
       key,
       scopes: [
         'https://www.googleapis.com/auth/spreadsheets',
