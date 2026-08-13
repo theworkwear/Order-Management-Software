@@ -140,9 +140,20 @@ export default function LoginPage() {
         </div>
 
         {/* Footer */}
-        <p className="text-center text-slate-500 text-xs mt-6">
-          The Work Wear Order Management System
-        </p>
+        <div className="text-center text-slate-500 text-xs mt-6 space-y-1">
+          <p>The Work Wear Order Management System</p>
+          <p className="text-[11px] text-slate-400">
+            Built by{' '}
+            <a
+              href="https://remotelyavailable.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-slate-300 hover:text-blue-400 font-medium underline underline-offset-2 transition-colors"
+            >
+              remotelyavailable.com
+            </a>
+          </p>
+        </div>
       </div>
     </div>
   );
