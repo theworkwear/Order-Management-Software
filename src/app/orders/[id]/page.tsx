@@ -919,25 +919,14 @@ export default function OrderDetailPage() {
             )}
 
             {!isDigitizer && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => setIsLandscapeModalOpen(true)}
-                  className="w-full btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium flex items-center justify-center gap-2 cursor-pointer transition-colors hover:bg-slate-100"
-                >
-                  <Printer className="w-4 h-4 text-slate-600" />
-                  Print / Export Sheet (Landscape)
-                </button>
-
-                <a
-                  href={`/api/orders/${encodeURIComponent(order.orderNumber)}/invoice`}
-                  download={`Invoice-${order.orderNumber}.pdf`}
-                  className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-xl text-xs font-medium flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  Download PDF Direct
-                </a>
-              </>
+              <button
+                type="button"
+                onClick={() => setIsLandscapeModalOpen(true)}
+                className="w-full btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium flex items-center justify-center gap-2 cursor-pointer transition-colors hover:bg-slate-100"
+              >
+                <Download className="w-4 h-4 text-slate-600" />
+                Download PDF
+              </button>
             )}
           </div>
 
