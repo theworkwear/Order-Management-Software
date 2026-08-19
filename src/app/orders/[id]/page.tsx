@@ -8,10 +8,11 @@ import StatusBadge from '@/components/ui/StatusBadge';
 import OrderEmailViewer from '@/components/ui/OrderEmailViewer';
 import { Order, OrderStatus, ORDER_STATUSES } from '@/lib/types/order';
 import { generateInvoicePdf } from '@/lib/utils/invoicePdf';
+import OrderLandscapeModal from '@/components/ui/OrderLandscapeModal';
 import {
   ArrowLeft, User, Mail, Phone, MapPin, Package, Hash, Save,
   ExternalLink, FolderOpen, Scan, FileText, CheckCircle,
-  AlertCircle, Loader2, ChevronDown, Download, Image, Upload, FileUp, Shield, Plus, Trash2
+  AlertCircle, Loader2, ChevronDown, Download, Image, Upload, FileUp, Shield, Plus, Trash2, Printer
 } from 'lucide-react';
 import ProductSelect from '@/components/ui/ProductSelect';
 import OrderActivityTimeline from '@/components/ui/OrderActivityTimeline';
@@ -44,6 +45,7 @@ export default function OrderDetailPage() {
   const [activeDriveTab, setActiveDriveTab] = useState<'artwork' | 'digitized'>('artwork');
   const [driveImagesLoading, setDriveImagesLoading] = useState(false);
   const [selectedImage, setSelectedImage] = useState<any | null>(null);
+  const [isLandscapeModalOpen, setIsLandscapeModalOpen] = useState(false);
 
   // Editable fields
   const [editFields, setEditFields] = useState({
@@ -917,14 +919,25 @@ export default function OrderDetailPage() {
             )}
 
             {!isDigitizer && (
-              <a
-                href={`/api/orders/${encodeURIComponent(order.orderNumber)}/invoice`}
-                download={`Invoice-${order.orderNumber}.pdf`}
-                className="w-full btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium flex items-center justify-center gap-2 cursor-pointer transition-colors hover:bg-slate-100"
-              >
-                <Download className="w-4 h-4" />
-                Download Invoice
-              </a>
+              <>
+                <button
+                  type="button"
+                  onClick={() => setIsLandscapeModalOpen(true)}
+                  className="w-full btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium flex items-center justify-center gap-2 cursor-pointer transition-colors hover:bg-slate-100"
+                >
+                  <Printer className="w-4 h-4 text-slate-600" />
+                  Print / Export Sheet (Landscape)
+                </button>
+
+                <a
+                  href={`/api/orders/${encodeURIComponent(order.orderNumber)}/invoice`}
+                  download={`Invoice-${order.orderNumber}.pdf`}
+                  className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-xl text-xs font-medium flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  Download PDF Direct
+                </a>
+              </>
             )}
           </div>
 
@@ -1015,6 +1028,17 @@ export default function OrderDetailPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Landscape Order Detail Modal Preview & Print */}
+      {order && (
+        <OrderLandscapeModal
+          order={order}
+          driveImages={driveImages}
+          digitizedFiles={digitizedDriveFiles}
+          isOpen={isLandscapeModalOpen}
+          onClose={() => setIsLandscapeModalOpen(false)}
+        />
       )}
     </div>
   );

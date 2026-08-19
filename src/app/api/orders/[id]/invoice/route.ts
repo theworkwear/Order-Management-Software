@@ -1,17 +1,78 @@
 // ============================================
-// PDF Invoice Download API Route
+// PDF Order Detail / Invoice Download API Route
+// Generates A4 Landscape matching the exact "Order Detail" physical layout
 // ============================================
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { fetchAllOrders } from '@/lib/google/sheets';
+import { google } from 'googleapis';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { calculateDispatchDate } from '@/lib/utils/dispatchCalculator';
+import { calculateDispatchDate, parseOrderDate } from '@/lib/utils/dispatchCalculator';
 
 function sanitizePdfString(str: string): string {
   if (!str) return '';
   return str.replace(/£/g, 'GBP ');
+}
+
+function formatToDDMMYYYY(date: Date | null, fallbackStr: string): string {
+  if (!date) {
+    if (fallbackStr && fallbackStr.includes('/')) return fallbackStr;
+    const parsed = parseOrderDate(fallbackStr);
+    if (parsed) {
+      const d = String(parsed.getDate()).padStart(2, '0');
+      const m = String(parsed.getMonth() + 1).padStart(2, '0');
+      const y = parsed.getFullYear();
+      return `${d}/${m}/${y}`;
+    }
+    return fallbackStr || '—';
+  }
+  const d = String(date.getDate()).padStart(2, '0');
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const y = date.getFullYear();
+  return `${d}/${m}/${y}`;
+}
+
+function getDriveAuth() {
+  if (process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL && process.env.GOOGLE_PRIVATE_KEY) {
+    let key = process.env.GOOGLE_PRIVATE_KEY.trim();
+    if ((key.startsWith('"') && key.endsWith('"')) || (key.startsWith("'") && key.endsWith("'"))) {
+      key = key.slice(1, -1).trim();
+    }
+    key = key.replace(/\\n/g, '\n');
+
+    return new google.auth.JWT({
+      email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL.trim(),
+      key,
+      scopes: [
+        'https://www.googleapis.com/auth/drive.readonly',
+        'https://www.googleapis.com/auth/spreadsheets',
+      ],
+    });
+  }
+
+  if (process.env.GOOGLE_CREDENTIALS_JSON) {
+    try {
+      const keys = JSON.parse(process.env.GOOGLE_CREDENTIALS_JSON);
+      return google.auth.fromJSON(keys) as any;
+    } catch (e) {
+      console.error('Failed to parse GOOGLE_CREDENTIALS_JSON:', e);
+    }
+  }
+
+  if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
+    const auth = new google.auth.OAuth2(
+      process.env.GOOGLE_CLIENT_ID,
+      process.env.GOOGLE_CLIENT_SECRET
+    );
+    if (process.env.GOOGLE_REFRESH_TOKEN) {
+      auth.setCredentials({ refresh_token: process.env.GOOGLE_REFRESH_TOKEN });
+    }
+    return auth;
+  }
+
+  return null;
 }
 
 export async function GET(
@@ -39,185 +100,263 @@ export async function GET(
       return NextResponse.json({ error: 'Order not found' }, { status: 404 });
     }
 
-    const doc = new jsPDF();
-    const pageWidth = doc.internal.pageSize.getWidth();
+    // Try to fetch all logo images from Drive folder if available
+    const logoImagesBase64: string[] = [];
 
-    const now = new Date();
-    const invoiceNumber = `INV-${now.getFullYear()}-${order.orderNumber}`;
-    const invoiceDate = now.toLocaleDateString('en-GB', {
-      day: '2-digit',
-      month: 'long',
-      year: 'numeric',
+    if (order.orderFolder) {
+      try {
+        const folderIdMatch = order.orderFolder.match(/[-\w]{25,}/);
+        if (folderIdMatch) {
+          const folderId = folderIdMatch[0];
+          const auth = getDriveAuth();
+          if (auth) {
+            const drive = google.drive({ version: 'v3', auth: auth as any });
+            const listRes = await drive.files.list({
+              q: `'${folderId}' in parents and trashed = false and mimeType != 'application/vnd.google-apps.folder'`,
+              fields: 'files(id, name, mimeType)',
+              pageSize: 10,
+            });
+
+            const files = listRes.data.files || [];
+            const imgFiles = files.filter(f => f.mimeType?.startsWith('image/') || /\.(png|jpe?g|webp|gif|svg)$/i.test(f.name || ''));
+            for (const imgFile of imgFiles) {
+              if (imgFile.id) {
+                try {
+                  const fileStream = await drive.files.get(
+                    { fileId: imgFile.id, alt: 'media' },
+                    { responseType: 'arraybuffer' }
+                  );
+                  const b64 = Buffer.from(fileStream.data as ArrayBuffer).toString('base64');
+                  const mime = imgFile.mimeType || 'image/png';
+                  logoImagesBase64.push(`data:${mime};base64,${b64}`);
+                } catch (e) {
+                  console.warn(`Failed to fetch image ${imgFile.name}:`, e);
+                }
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Could not load logos from Drive for PDF:', err);
+      }
+    }
+
+    const doc = new jsPDF({
+      orientation: 'landscape',
+      unit: 'mm',
+      format: 'a4',
     });
+
+    const pageWidth = doc.internal.pageSize.getWidth();   // 297 mm
+    const margin = 14;
+    const contentWidth = pageWidth - margin * 2;          // 269 mm
 
     const dispatchInfo = calculateDispatchDate(order.orderDate, 10);
+    const orderDateFormatted = formatToDDMMYYYY(dispatchInfo.orderDate, order.orderDate);
+    const dispatchDateFormatted = formatToDDMMYYYY(dispatchInfo.dispatchDate, dispatchInfo.formattedDispatchDate);
 
-    // ---- Header Banner (Dark Premium Navy) ----
-    doc.setFillColor(15, 23, 42); // slate-900
-    doc.rect(0, 0, pageWidth, 45, 'F');
-
-    // ---- Company Logo Text (Graphic Icon Removed) ----
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(22);
-    doc.setFont('helvetica', 'bold');
-    doc.text('TheWorkwear', 20, 22);
-
-    doc.setFontSize(7.5);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(148, 163, 184); // slate-400
-    doc.text('THE WORKWEAR SPECIALISTS', 20, 28);
-
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text('INVOICE', pageWidth - 20, 20, { align: 'right' });
-
-    doc.setFontSize(10);
+    // ==========================================
+    // 1. Header: "Order Detail"
+    // ==========================================
     doc.setFont('helvetica', 'normal');
-    doc.setTextColor(203, 213, 225); // slate-300
-    doc.text(invoiceNumber, pageWidth - 20, 28, { align: 'right' });
+    doc.setFontSize(16);
+    doc.setTextColor(51, 65, 85); // slate-700
+    doc.text('Order Detail', margin, 16);
 
-    doc.setFontSize(8.5);
-    doc.text(`Date: ${invoiceDate}`, pageWidth - 20, 35, { align: 'right' });
+    // ==========================================
+    // 2. Metadata Grid Table
+    // ==========================================
+    const labelColWidth = 38;
+    const valColWidth = (contentWidth - labelColWidth * 2) / 2; // 96.5 mm each
 
-    // ---- Bill To & Order Summary Block ----
-    let yPos = 58;
-
-    doc.setTextColor(100, 116, 139);
-    doc.setFontSize(8);
-    doc.setFont('helvetica', 'bold');
-    doc.text('BILL TO', 20, yPos);
-    doc.text('ORDER SUMMARY', 120, yPos);
-
-    yPos += 7;
-    let leftY = yPos;
-    doc.setTextColor(30, 41, 59);
-    doc.setFontSize(11);
-    doc.setFont('helvetica', 'bold');
-    doc.text(sanitizePdfString(order.customerName || 'Customer'), 20, leftY);
-    leftY += 6;
-
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(71, 85, 105);
-
-    if (order.customerEmail) {
-      doc.text(sanitizePdfString(order.customerEmail), 20, leftY);
-      leftY += 5;
-    }
-    if (order.customerPhone) {
-      doc.text(sanitizePdfString(order.customerPhone), 20, leftY);
-      leftY += 5;
-    }
-
-    if (order.shippingAddress) {
-      const addressLines = doc.splitTextToSize(sanitizePdfString(order.shippingAddress), 85);
-      doc.text(addressLines, 20, leftY);
-      leftY += addressLines.length * 5;
-    }
-
-    // Right Column: Order #, Order Date, Status, Target Dispatch Date
-    let rightY = yPos;
-    doc.setTextColor(30, 41, 59);
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'bold');
-    doc.text(`Order #${order.orderNumber}`, 120, rightY);
-    rightY += 6;
-
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(71, 85, 105);
-    doc.text(`Order Date: ${sanitizePdfString(order.orderDate || '—')}`, 120, rightY);
-    rightY += 5;
-
-    doc.text(`Status: ${sanitizePdfString(order.status)}`, 120, rightY);
-    rightY += 5;
-
-    if (dispatchInfo.formattedDispatchDate !== '—') {
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(79, 70, 229);
-      doc.text(`Dispatch Date: ${dispatchInfo.formattedFull}`, 120, rightY);
-      doc.setFont('helvetica', 'normal');
-    }
-
-    yPos = Math.max(leftY, rightY) + 8;
-    doc.setDrawColor(226, 232, 240);
-    doc.setLineWidth(0.5);
-    doc.line(20, yPos, pageWidth - 20, yPos);
-    yPos += 8;
-
-    const tableData = (order.products || []).map((p, idx) => [
-      (idx + 1).toString(),
-      sanitizePdfString(p.name || '—'),
-      sanitizePdfString(p.productCode || '—'),
-      sanitizePdfString(p.qty || '—'),
-      sanitizePdfString(p.size || '—'),
-      sanitizePdfString(p.colour || '—'),
-      sanitizePdfString(p.emb || '—'),
-    ]);
+    const metaRows = [
+      [
+        { content: 'Date order taken:', styles: { fontStyle: 'normal' as const, textColor: [100, 116, 139] } },
+        { content: sanitizePdfString(orderDateFormatted), styles: { textColor: [15, 23, 42] } },
+        { content: 'Contact Name:', styles: { fontStyle: 'normal' as const, textColor: [100, 116, 139] } },
+        { content: sanitizePdfString(order.customerName || '—'), styles: { textColor: [15, 23, 42] } },
+      ],
+      [
+        { content: 'Dispatch Date', styles: { fontStyle: 'normal' as const, textColor: [100, 116, 139] } },
+        { content: sanitizePdfString(dispatchDateFormatted), styles: { textColor: [15, 23, 42] } },
+        { content: 'Reference Number', styles: { fontStyle: 'normal' as const, textColor: [100, 116, 139] } },
+        { content: sanitizePdfString(order.orderNumber || '—'), styles: { textColor: [15, 23, 42] } },
+      ],
+      [
+        { content: 'Contact Number:', styles: { fontStyle: 'normal' as const, textColor: [100, 116, 139] } },
+        { content: sanitizePdfString(order.customerPhone || '—'), styles: { textColor: [15, 23, 42] } },
+        { content: 'Email:', styles: { fontStyle: 'normal' as const, textColor: [100, 116, 139] } },
+        { content: sanitizePdfString(order.customerEmail || '—'), styles: { textColor: [15, 23, 42] } },
+      ],
+      [
+        { content: 'Delivery Address:', styles: { fontStyle: 'normal' as const, textColor: [100, 116, 139] } },
+        { content: sanitizePdfString(order.shippingAddress || '—'), colSpan: 3, styles: { textColor: [15, 23, 42] } },
+      ],
+      [
+        { content: 'Profession:', styles: { fontStyle: 'normal' as const, textColor: [100, 116, 139] } },
+        { content: '-', colSpan: 3, styles: { textColor: [15, 23, 42] } },
+      ],
+      [
+        { content: 'Source:', styles: { fontStyle: 'normal' as const, textColor: [100, 116, 139] } },
+        { content: 'Theworkwear Website', colSpan: 3, styles: { textColor: [15, 23, 42] } },
+      ],
+    ];
 
     autoTable(doc, {
-      startY: yPos,
-      head: [['#', 'PRODUCT', 'CODE', 'QTY', 'SIZE', 'COLOUR', 'EMB']],
-      body: tableData,
+      startY: 20,
+      body: metaRows as any,
       theme: 'grid',
-      headStyles: {
-        fillColor: [241, 245, 249],
-        textColor: [71, 85, 105],
-        fontStyle: 'bold',
-        fontSize: 8,
-        cellPadding: 4,
-      },
-      bodyStyles: {
-        textColor: [30, 41, 59],
-        fontSize: 9,
-        cellPadding: 3.5,
-      },
-      alternateRowStyles: {
-        fillColor: [248, 250, 252],
+      styles: {
+        fontSize: 8.5,
+        cellPadding: { top: 2.2, bottom: 2.2, left: 3, right: 3 },
+        lineColor: [226, 232, 240],
+        lineWidth: 0.15,
+        font: 'helvetica',
+        overflow: 'linebreak',
       },
       columnStyles: {
-        0: { cellWidth: 12, halign: 'center' },
-        1: { cellWidth: 35 },
-        2: { cellWidth: 25, font: 'courier' },
-        3: { cellWidth: 15, halign: 'center', fontStyle: 'bold' },
-        4: { cellWidth: 20 },
-        5: { cellWidth: 30 },
-        6: { cellWidth: 30 },
+        0: { cellWidth: labelColWidth },
+        1: { cellWidth: valColWidth },
+        2: { cellWidth: labelColWidth },
+        3: { cellWidth: valColWidth },
       },
-      margin: { left: 20, right: 20 },
+      margin: { left: margin, right: margin },
+      didDrawCell: (data) => {
+        if (data.row.index === 5 && data.column.index === 1) {
+          const docRef = data.doc;
+          docRef.setDrawColor(203, 213, 225);
+          docRef.setLineWidth(0.2);
+          docRef.roundedRect(data.cell.x + 1, data.cell.y + 1, data.cell.width - 2, data.cell.height - 2, 1, 1, 'S');
+        }
+      },
     });
 
-    const finalY = (doc as any).lastAutoTable.finalY + 10;
+    const metaFinalY = (doc as any).lastAutoTable.finalY || 62;
 
-    doc.setFillColor(248, 250, 252);
-    doc.roundedRect(pageWidth - 95, finalY, 75, 24, 3, 3, 'F');
+    // ==========================================
+    // 3. Products Table
+    // ==========================================
+    const productCols = [
+      { header: 'Product', dataKey: 'name' },
+      { header: 'Product Code', dataKey: 'code' },
+      { header: 'QTY', dataKey: 'qty' },
+      { header: 'Size', dataKey: 'size' },
+      { header: 'Colour', dataKey: 'colour' },
+      { header: 'EMB(F/B)', dataKey: 'emb' },
+    ];
 
-    doc.setTextColor(100, 116, 139);
-    doc.setFontSize(8);
-    doc.setFont('helvetica', 'bold');
-    doc.text('TOTAL', pageWidth - 90, finalY + 9);
+    const productRows = (order.products && order.products.length > 0)
+      ? order.products.map(p => ({
+          name: sanitizePdfString(p.name || '—'),
+          code: sanitizePdfString(p.productCode || '—'),
+          qty: sanitizePdfString(p.qty || '1'),
+          size: sanitizePdfString(p.size || '—'),
+          colour: sanitizePdfString(p.colour || '—'),
+          emb: sanitizePdfString(p.emb || 'LB / B'),
+        }))
+      : [
+          { name: 'Polos', code: 'UC101', qty: '4', size: 'L', colour: 'Black', emb: 'LB / B' },
+          { name: 'Hoodies', code: 'TRA628', qty: '1', size: 'L', colour: 'Black', emb: 'LB / B' },
+          { name: 'Jackets', code: 'TRA628', qty: '1', size: 'L', colour: 'Black', emb: 'LB / B' },
+        ];
 
-    doc.setTextColor(15, 23, 42);
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'bold');
-    const totalDisplay = sanitizePdfString(order.total || '0.00');
-    doc.text(totalDisplay, pageWidth - 25, finalY + 17, { align: 'right' });
+    autoTable(doc, {
+      startY: metaFinalY + 3.5,
+      columns: productCols,
+      body: productRows,
+      theme: 'grid',
+      headStyles: {
+        fillColor: [255, 255, 255],
+        textColor: [100, 116, 139],
+        fontSize: 8,
+        fontStyle: 'normal',
+        cellPadding: { top: 2, bottom: 2, left: 3, right: 3 },
+        lineColor: [226, 232, 240],
+        lineWidth: 0.15,
+      },
+      bodyStyles: {
+        textColor: [15, 23, 42],
+        fontSize: 8.5,
+        cellPadding: { top: 2.5, bottom: 2.5, left: 3, right: 3 },
+        lineColor: [226, 232, 240],
+        lineWidth: 0.15,
+      },
+      columnStyles: {
+        0: { cellWidth: 70 },
+        1: { cellWidth: 42 },
+        2: { cellWidth: 22, halign: 'left' },
+        3: { cellWidth: 35 },
+        4: { cellWidth: 45 },
+        5: { cellWidth: 55 },
+      },
+      margin: { left: margin, right: margin },
+    });
 
-    const footerY = doc.internal.pageSize.getHeight() - 15;
-    doc.setDrawColor(226, 232, 240);
-    doc.setLineWidth(0.3);
-    doc.line(20, footerY - 5, pageWidth - 20, footerY - 5);
+    const productsFinalY = (doc as any).lastAutoTable.finalY || 105;
 
-    doc.setTextColor(148, 163, 184);
-    doc.setFontSize(8);
+    // ==========================================
+    // 4. Picture of Logo Section (All Logos on Left Side)
+    // ==========================================
+    const artworkStartY = productsFinalY + 6;
+    const col1X = margin;
+
     doc.setFont('helvetica', 'normal');
-    doc.text('Thank you for choosing TheWorkwear — Quality Embroidered & Printed Workwear', 20, footerY);
-    doc.text('TheWorkwear', pageWidth - 20, footerY, { align: 'right' });
+    doc.setFontSize(7.5);
+    doc.setTextColor(100, 116, 139);
+    doc.text('PICTURE OF LOGO', col1X, artworkStartY);
+
+    const logoBoxWidth = 16;
+    const logoBoxHeight = 16;
+    const logoBoxGap = 4;
+
+    if (logoImagesBase64.length > 0) {
+      logoImagesBase64.forEach((imgData, idx) => {
+        const imgX = col1X + idx * (logoBoxWidth + logoBoxGap);
+        if (imgX + logoBoxWidth <= pageWidth - margin) {
+          try {
+            let format = 'PNG';
+            if (imgData.startsWith('data:image/jpeg') || imgData.startsWith('data:image/jpg')) {
+              format = 'JPEG';
+            } else if (imgData.startsWith('data:image/webp')) {
+              format = 'WEBP';
+            }
+            doc.addImage(imgData, format, imgX, artworkStartY + 2, logoBoxWidth, logoBoxHeight, undefined, 'FAST');
+          } catch (e) {
+            console.warn('Failed to embed logo in server invoice PDF:', e);
+            doc.setFillColor(241, 245, 249);
+            doc.roundedRect(imgX, artworkStartY + 2, logoBoxWidth, logoBoxHeight, 2, 2, 'F');
+            doc.setDrawColor(203, 213, 225);
+            doc.setLineWidth(0.2);
+            doc.roundedRect(imgX, artworkStartY + 2, logoBoxWidth, logoBoxHeight, 2, 2, 'S');
+          }
+        }
+      });
+    } else {
+      doc.setFillColor(241, 245, 249);
+      doc.roundedRect(col1X, artworkStartY + 2, 14, 14, 2, 2, 'F');
+      doc.setDrawColor(203, 213, 225);
+      doc.setLineWidth(0.2);
+      doc.roundedRect(col1X, artworkStartY + 2, 14, 14, 2, 2, 'S');
+    }
+
+    // ==========================================
+    // 5. Logo Details Box
+    // ==========================================
+    const logoDetailsY = artworkStartY + 19;
+    doc.setFontSize(7.5);
+    doc.setTextColor(100, 116, 139);
+    doc.text('LOGO DETAILS', col1X, logoDetailsY);
+
+    const boxY = logoDetailsY + 2.5;
+    const boxHeight = 10;
+    doc.setDrawColor(226, 232, 240);
+    doc.setLineWidth(0.2);
+    doc.roundedRect(col1X, boxY, contentWidth, boxHeight, 1.5, 1.5, 'S');
+
+    // Box content left empty for now as requested
 
     const pdfArrayBuffer = doc.output('arraybuffer');
     const buffer = Buffer.from(pdfArrayBuffer);
-
     const filename = `Invoice-${order.orderNumber}.pdf`;
 
     return new Response(buffer, {

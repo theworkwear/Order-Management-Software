@@ -3,8 +3,9 @@
 import { useState, useEffect } from 'react';
 import { Invoice } from '@/lib/types/invoice';
 import {
-  FileText, Download, Eye, RefreshCw, AlertCircle
+  FileText, Download, Eye, RefreshCw, AlertCircle, X, Printer
 } from 'lucide-react';
+import { generateInvoicePdf } from '@/lib/utils/invoicePdf';
 
 export default function InvoicesPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -30,6 +31,34 @@ export default function InvoicesPage() {
     }
   };
 
+  const handleDownloadPdf = (invoice: Invoice) => {
+    // Map invoice to order shape for landscape export
+    const fakeOrder: any = {
+      orderNumber: invoice.orderNumber,
+      orderDate: invoice.invoiceDate,
+      customerName: invoice.customerName,
+      customerEmail: invoice.customerEmail,
+      customerPhone: invoice.customerPhone,
+      shippingAddress: invoice.shippingAddress,
+      total: invoice.total,
+      products: invoice.items.map((item, idx) => ({
+        index: idx + 1,
+        name: item.product,
+        productCode: item.productCode || '',
+        qty: item.qty || '1',
+        size: item.size || '',
+        colour: item.colour || '',
+        emb: item.emb || 'LB / B',
+      })),
+    };
+
+    generateInvoicePdf(fakeOrder, {
+      profession: '-',
+      source: 'Theworkwear Website',
+      logoDetails: '',
+    });
+  };
+
   return (
     <div className="p-6 md:p-8 space-y-5 fade-in">
       {/* Header */}
@@ -37,7 +66,7 @@ export default function InvoicesPage() {
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Invoices</h1>
           <p className="text-sm text-slate-500 mt-0.5">
-            Generated invoices from orders
+            Generated invoices and landscape order detail exports
           </p>
         </div>
         <button
@@ -97,15 +126,23 @@ export default function InvoicesPage() {
                     <td className="px-5 py-3.5 text-sm text-slate-600">{invoice.customerName}</td>
                     <td className="px-5 py-3.5 text-sm text-slate-500">{invoice.invoiceDate}</td>
                     <td className="px-5 py-3.5 text-sm font-semibold text-slate-800">
-                      {invoice.total ? `$${invoice.total}` : '—'}
+                      {invoice.total ? `£${invoice.total}` : '—'}
                     </td>
-                    <td className="px-5 py-3.5">
+                    <td className="px-5 py-3.5 flex items-center gap-2">
                       <button
                         onClick={() => setPreviewInvoice(invoice)}
                         className="px-2.5 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-xs font-medium hover:bg-blue-100 transition-colors inline-flex items-center gap-1"
                       >
                         <Eye className="w-3.5 h-3.5" />
                         Preview
+                      </button>
+
+                      <button
+                        onClick={() => handleDownloadPdf(invoice)}
+                        className="px-2.5 py-1.5 bg-slate-100 text-slate-700 rounded-lg text-xs font-medium hover:bg-slate-200 transition-colors inline-flex items-center gap-1"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        PDF
                       </button>
                     </td>
                   </tr>
@@ -116,86 +153,129 @@ export default function InvoicesPage() {
         </div>
       </div>
 
-      {/* Invoice Preview Modal */}
+      {/* Invoice Landscape Preview Modal */}
       {previewInvoice && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setPreviewInvoice(null)}>
-          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            {/* Invoice Header */}
-            <div className="px-8 pt-8 pb-6 border-b border-slate-100">
-              <div className="flex items-start justify-between">
-                <div>
-                  <h2 className="text-2xl font-bold text-slate-900">INVOICE</h2>
-                  <p className="text-blue-600 font-semibold mt-1">{previewInvoice.invoiceNumber}</p>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 overflow-y-auto" onClick={() => setPreviewInvoice(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-5xl w-full max-h-[95vh] flex flex-col overflow-hidden animate-in fade-in" onClick={(e) => e.stopPropagation()}>
+            {/* Modal Top Bar */}
+            <div className="px-6 py-4 bg-slate-900 text-white flex items-center justify-between no-print">
+              <div className="flex items-center gap-2">
+                <FileText className="w-5 h-5 text-indigo-400" />
+                <span className="font-semibold text-sm">Landscape Order Detail Sheet — #{previewInvoice.orderNumber}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => window.print()}
+                  className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-xs font-medium flex items-center gap-1.5"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  Print (Landscape)
+                </button>
+                <button
+                  onClick={() => handleDownloadPdf(previewInvoice)}
+                  className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-medium flex items-center gap-1.5 shadow-sm"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  Download PDF
+                </button>
+                <button onClick={() => setPreviewInvoice(null)} className="p-1.5 text-slate-400 hover:text-white rounded-lg">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Document Preview Content */}
+            <div className="p-6 bg-slate-100 overflow-auto flex justify-center print:p-0 print:bg-white">
+              <div id="order-landscape-print-area" className="w-full max-w-[950px] bg-white text-slate-900 p-8 rounded-xl shadow-sm border border-slate-200 text-xs space-y-3 print:border-none print:shadow-none">
+                <h1 className="text-xl font-semibold text-slate-700 pb-0.5">Order Detail</h1>
+
+                {/* Metadata Grid */}
+                <div className="border border-slate-200 rounded-xs overflow-hidden text-[11px]">
+                  <div className="grid grid-cols-12 border-b border-slate-200">
+                    <div className="col-span-2 px-3 py-1.5 text-slate-500 border-r border-slate-200">Date order taken:</div>
+                    <div className="col-span-4 px-3 py-1.5 text-slate-900 font-medium border-r border-slate-200">{previewInvoice.invoiceDate}</div>
+                    <div className="col-span-2 px-3 py-1.5 text-slate-500 border-r border-slate-200">Contact Name:</div>
+                    <div className="col-span-4 px-3 py-1.5 text-slate-900 font-medium">{previewInvoice.customerName}</div>
+                  </div>
+
+                  <div className="grid grid-cols-12 border-b border-slate-200">
+                    <div className="col-span-2 px-3 py-1.5 text-slate-500 border-r border-slate-200">Dispatch Date</div>
+                    <div className="col-span-4 px-3 py-1.5 text-slate-900 font-medium border-r border-slate-200">—</div>
+                    <div className="col-span-2 px-3 py-1.5 text-slate-500 border-r border-slate-200">Reference Number</div>
+                    <div className="col-span-4 px-3 py-1.5 text-slate-900 font-medium">{previewInvoice.orderNumber}</div>
+                  </div>
+
+                  <div className="grid grid-cols-12 border-b border-slate-200">
+                    <div className="col-span-2 px-3 py-1.5 text-slate-500 border-r border-slate-200">Contact Number:</div>
+                    <div className="col-span-4 px-3 py-1.5 text-slate-900 font-medium border-r border-slate-200">{previewInvoice.customerPhone || '—'}</div>
+                    <div className="col-span-2 px-3 py-1.5 text-slate-500 border-r border-slate-200">Email:</div>
+                    <div className="col-span-4 px-3 py-1.5 text-slate-900 font-medium truncate">{previewInvoice.customerEmail || '—'}</div>
+                  </div>
+
+                  <div className="grid grid-cols-12 border-b border-slate-200">
+                    <div className="col-span-2 px-3 py-1.5 text-slate-500 border-r border-slate-200">Delivery Address:</div>
+                    <div className="col-span-10 px-3 py-1.5 text-slate-900 font-medium">{previewInvoice.shippingAddress || '—'}</div>
+                  </div>
+
+                  <div className="grid grid-cols-12 border-b border-slate-200">
+                    <div className="col-span-2 px-3 py-1.5 text-slate-500 border-r border-slate-200">Profession:</div>
+                    <div className="col-span-10 px-3 py-1.5 text-slate-900 font-medium">-</div>
+                  </div>
+
+                  <div className="grid grid-cols-12">
+                    <div className="col-span-2 px-3 py-1.5 text-slate-500 border-r border-slate-200 flex items-center">Source:</div>
+                    <div className="col-span-10 px-3 py-1.5">
+                      <span className="inline-block border border-slate-300 rounded px-2 py-0.5 text-slate-800 text-[11px]">Theworkwear Website</span>
+                    </div>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-sm text-slate-500">Date</p>
-                  <p className="text-sm font-medium text-slate-800">{previewInvoice.invoiceDate}</p>
+
+                {/* Items */}
+                <div className="border border-slate-200 rounded-xs overflow-hidden text-[11px] mt-2">
+                  <table className="w-full text-left">
+                    <thead>
+                      <tr className="border-b border-slate-200 text-slate-500 font-normal bg-white">
+                        <th className="px-3 py-2 font-normal">Product</th>
+                        <th className="px-3 py-2 font-normal">Product Code</th>
+                        <th className="px-3 py-2 font-normal">QTY</th>
+                        <th className="px-3 py-2 font-normal">Size</th>
+                        <th className="px-3 py-2 font-normal">Colour</th>
+                        <th className="px-3 py-2 font-normal">EMB(F/B)</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200 text-slate-900 font-medium">
+                      {previewInvoice.items.map((item, idx) => (
+                        <tr key={idx}>
+                          <td className="px-3 py-2 text-slate-800">{item.product}</td>
+                          <td className="px-3 py-2 text-slate-700">{item.productCode || '—'}</td>
+                          <td className="px-3 py-2 text-slate-900">{item.qty || '1'}</td>
+                          <td className="px-3 py-2 text-slate-700">{item.size || '—'}</td>
+                          <td className="px-3 py-2 text-slate-700">{item.colour || '—'}</td>
+                          <td className="px-3 py-2 text-slate-700">{item.emb || 'LB / B'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Pictures of Logo (All on Left Side) */}
+                <div className="pt-2">
+                  <p className="text-slate-400 uppercase tracking-wider text-[10px] mb-1">PICTURE OF LOGO</p>
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 border border-slate-200 rounded bg-slate-50 flex items-center justify-center text-slate-300">
+                      <FileText className="w-5 h-5" />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Logo Details */}
+                <div className="pt-2">
+                  <p className="text-slate-400 uppercase tracking-wider text-[10px] mb-1">LOGO DETAILS</p>
+                  <div className="border border-slate-200 rounded-sm px-3 py-2 text-slate-800 text-xs min-h-[30px]">
+                    {/* Empty */}
+                  </div>
                 </div>
               </div>
-            </div>
-
-            {/* Bill To */}
-            <div className="px-8 py-6 grid grid-cols-2 gap-6">
-              <div>
-                <p className="text-xs font-semibold text-slate-400 uppercase mb-2">Bill To</p>
-                <p className="text-sm font-semibold text-slate-800">{previewInvoice.customerName}</p>
-                {previewInvoice.customerEmail && <p className="text-sm text-slate-500">{previewInvoice.customerEmail}</p>}
-                {previewInvoice.customerPhone && <p className="text-sm text-slate-500">{previewInvoice.customerPhone}</p>}
-                {previewInvoice.shippingAddress && <p className="text-sm text-slate-500">{previewInvoice.shippingAddress}</p>}
-              </div>
-              <div>
-                <p className="text-xs font-semibold text-slate-400 uppercase mb-2">Order</p>
-                <p className="text-sm text-slate-800">Order #{previewInvoice.orderNumber}</p>
-              </div>
-            </div>
-
-            {/* Items */}
-            <div className="px-8 pb-6">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b-2 border-slate-200">
-                    <th className="pb-2 text-left text-xs font-semibold text-slate-500">Product</th>
-                    <th className="pb-2 text-left text-xs font-semibold text-slate-500">Code</th>
-                    <th className="pb-2 text-center text-xs font-semibold text-slate-500">QTY</th>
-                    <th className="pb-2 text-left text-xs font-semibold text-slate-500">Size</th>
-                    <th className="pb-2 text-left text-xs font-semibold text-slate-500">Colour</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {previewInvoice.items.map((item, idx) => (
-                    <tr key={idx} className="border-b border-slate-100">
-                      <td className="py-2.5 text-sm text-slate-800">{item.product}</td>
-                      <td className="py-2.5 text-sm text-slate-500 font-mono">{item.productCode || '—'}</td>
-                      <td className="py-2.5 text-sm text-center font-medium text-slate-800">{item.qty || '—'}</td>
-                      <td className="py-2.5 text-sm text-slate-500">{item.size || '—'}</td>
-                      <td className="py-2.5 text-sm text-slate-500">{item.colour || '—'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Total */}
-            <div className="px-8 py-4 bg-slate-50 border-t border-slate-100">
-              <div className="flex justify-end">
-                <div className="text-right">
-                  <p className="text-xs text-slate-400 uppercase">Total</p>
-                  <p className="text-2xl font-bold text-slate-900">
-                    ${previewInvoice.total || '0.00'}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Footer */}
-            <div className="px-8 py-4 border-t border-slate-100 flex items-center justify-between">
-              <p className="text-xs text-slate-400">Thank you for your business!</p>
-              <button
-                onClick={() => setPreviewInvoice(null)}
-                className="btn-secondary px-4 py-2 rounded-xl text-sm font-medium"
-              >
-                Close
-              </button>
             </div>
           </div>
         </div>

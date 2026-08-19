@@ -180,3 +180,31 @@
     border-color: #cbd5e1;
   }
 }
+
+@media print {
+  @page {
+    size: landscape;
+    margin: 8mm;
+  }
+
+  body {
+    background: white !important;
+    color: black !important;
+  }
+
+  .no-print,
+  nav,
+  aside,
+  header {
+    display: none !important;
+  }
+
+  #order-landscape-print-area {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+}
