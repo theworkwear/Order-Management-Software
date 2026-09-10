@@ -256,7 +256,7 @@ export async function GET(
         }))
       : [
           { name: 'Polos', code: 'UC101', qty: '4', size: 'L', colour: 'Black', emb: 'LB / B' },
-          { name: 'Hoodies', code: 'TRA628', qty: '1', size: 'L', colour: 'Black', emb: 'LB / B' },
+          { name: 'Hoodies', code: 'UX4', qty: '1', size: 'L', colour: 'Black', emb: 'LB / B' },
           { name: 'Jackets', code: 'TRA628', qty: '1', size: 'L', colour: 'Black', emb: 'LB / B' },
         ];
 
@@ -308,6 +308,7 @@ export async function GET(
     const logoBoxWidth = 16;
     const logoBoxHeight = 16;
     const logoBoxGap = 4;
+    const logoImgTopY = artworkStartY + 2.5;
 
     if (logoImagesBase64.length > 0) {
       logoImagesBase64.forEach((imgData, idx) => {
@@ -320,40 +321,47 @@ export async function GET(
             } else if (imgData.startsWith('data:image/webp')) {
               format = 'WEBP';
             }
-            doc.addImage(imgData, format, imgX, artworkStartY + 2, logoBoxWidth, logoBoxHeight, undefined, 'FAST');
+            doc.addImage(imgData, format, imgX, logoImgTopY, logoBoxWidth, logoBoxHeight, undefined, 'FAST');
           } catch (e) {
             console.warn('Failed to embed logo in server invoice PDF:', e);
             doc.setFillColor(241, 245, 249);
-            doc.roundedRect(imgX, artworkStartY + 2, logoBoxWidth, logoBoxHeight, 2, 2, 'F');
+            doc.roundedRect(imgX, logoImgTopY, logoBoxWidth, logoBoxHeight, 2, 2, 'F');
             doc.setDrawColor(203, 213, 225);
             doc.setLineWidth(0.2);
-            doc.roundedRect(imgX, artworkStartY + 2, logoBoxWidth, logoBoxHeight, 2, 2, 'S');
+            doc.roundedRect(imgX, logoImgTopY, logoBoxWidth, logoBoxHeight, 2, 2, 'S');
           }
         }
       });
     } else {
       doc.setFillColor(241, 245, 249);
-      doc.roundedRect(col1X, artworkStartY + 2, 14, 14, 2, 2, 'F');
+      doc.roundedRect(col1X, logoImgTopY, 14, 14, 2, 2, 'F');
       doc.setDrawColor(203, 213, 225);
       doc.setLineWidth(0.2);
-      doc.roundedRect(col1X, artworkStartY + 2, 14, 14, 2, 2, 'S');
+      doc.roundedRect(col1X, logoImgTopY, 14, 14, 2, 2, 'S');
     }
 
     // ==========================================
-    // 5. Logo Details Box
+    // 5. Logo Details Box (Properly offset below images)
     // ==========================================
-    const logoDetailsY = artworkStartY + 19;
+    const logoImgBottomY = logoImgTopY + logoBoxHeight;
+    const logoDetailsY = logoImgBottomY + 6; // Clear 6mm spacing below the logo pictures
     doc.setFontSize(7.5);
     doc.setTextColor(100, 116, 139);
     doc.text('LOGO DETAILS', col1X, logoDetailsY);
 
     const boxY = logoDetailsY + 2.5;
-    const boxHeight = 10;
+    const boxHeight = 12;
     doc.setDrawColor(226, 232, 240);
     doc.setLineWidth(0.2);
     doc.roundedRect(col1X, boxY, contentWidth, boxHeight, 1.5, 1.5, 'S');
 
-    // Box content left empty for now as requested
+    doc.setFontSize(8);
+    doc.setTextColor(30, 41, 59);
+    const logoDetailsText = order.logoDetails || '';
+    if (logoDetailsText.trim()) {
+      const splitLines = doc.splitTextToSize(sanitizePdfString(logoDetailsText), contentWidth - 6);
+      doc.text(splitLines, col1X + 3, boxY + 4.5);
+    }
 
     const pdfArrayBuffer = doc.output('arraybuffer');
     const buffer = Buffer.from(pdfArrayBuffer);

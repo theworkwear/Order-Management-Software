@@ -5,7 +5,6 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import StatusBadge from '@/components/ui/StatusBadge';
-import OrderEmailViewer from '@/components/ui/OrderEmailViewer';
 import { Order, OrderStatus, ORDER_STATUSES } from '@/lib/types/order';
 import { generateInvoicePdf } from '@/lib/utils/invoicePdf';
 import OrderLandscapeModal from '@/components/ui/OrderLandscapeModal';
@@ -40,9 +39,6 @@ export default function OrderDetailPage() {
   const [successMsg, setSuccessMsg] = useState('');
   const [invoiceLoading, setInvoiceLoading] = useState(false);
   const [driveImages, setDriveImages] = useState<any[]>([]);
-  const [digitizedDriveFiles, setDigitizedDriveFiles] = useState<any[]>([]);
-  const [detectedDigitizedFolderUrl, setDetectedDigitizedFolderUrl] = useState<string | null>(null);
-  const [activeDriveTab, setActiveDriveTab] = useState<'artwork' | 'digitized'>('artwork');
   const [driveImagesLoading, setDriveImagesLoading] = useState(false);
   const [selectedImage, setSelectedImage] = useState<any | null>(null);
   const [isLandscapeModalOpen, setIsLandscapeModalOpen] = useState(false);
@@ -58,6 +54,7 @@ export default function OrderDetailPage() {
     total: '',
     orderFolder: '',
     digitizedFolder: '',
+    logoDetails: '',
   });
 
   const [editProducts, setEditProducts] = useState<{
@@ -102,6 +99,7 @@ export default function OrderDetailPage() {
         total: data.order.total || '',
         orderFolder: data.order.orderFolder || '',
         digitizedFolder: data.order.digitizedFolder || '',
+        logoDetails: data.order.logoDetails || '',
       });
       setEditProducts(data.order.products ? [...data.order.products] : []);
     } catch (err: any) {
@@ -111,8 +109,6 @@ export default function OrderDetailPage() {
     }
   };
 
-
-
   const fetchDriveImages = async (folderUrl: string) => {
     if (!folderUrl) return;
     try {
@@ -121,8 +117,6 @@ export default function OrderDetailPage() {
       if (!res.ok) return;
       const data = await res.json();
       if (data.images) setDriveImages(data.images);
-      if (data.digitizedFiles) setDigitizedDriveFiles(data.digitizedFiles);
-      if (data.digitizedFolderUrl) setDetectedDigitizedFolderUrl(data.digitizedFolderUrl);
     } catch {
       // Silently fail
     } finally {
@@ -134,7 +128,7 @@ export default function OrderDetailPage() {
     const file = e.target.files?.[0];
     if (!file || !order) return;
 
-    const folderUrl = order.digitizedFolder || order.orderFolder;
+    const folderUrl = order.orderFolder;
     if (!folderUrl) {
       setError('No Google Drive folder URL available for this order');
       return;
@@ -170,7 +164,6 @@ export default function OrderDetailPage() {
       });
 
       // Refresh images
-      if (order.digitizedFolder) fetchDriveImages(order.digitizedFolder);
       if (order.orderFolder) fetchDriveImages(order.orderFolder);
 
       setTimeout(() => setSuccessMsg(''), 4000);
@@ -543,6 +536,24 @@ export default function OrderDetailPage() {
             </div>
           )}
 
+          {/* Logo Details */}
+          <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-2">
+              <Image className="w-4.5 h-4.5 text-blue-600" />
+              <h2 className="font-semibold text-slate-900">Logo Details</h2>
+            </div>
+            <div className="p-6">
+              <textarea
+                value={editFields.logoDetails}
+                onChange={(e) => setEditFields(prev => ({ ...prev, logoDetails: e.target.value }))}
+                placeholder="Enter logo details..."
+                rows={3}
+                disabled={isDigitizer}
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300 transition-all resize-y"
+              />
+            </div>
+          </div>
+
           {/* Products Table */}
           <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
@@ -700,60 +711,26 @@ export default function OrderDetailPage() {
               <div className="flex items-center gap-2">
                 <FolderOpen className="w-4.5 h-4.5 text-blue-600" />
                 <h2 className="font-semibold text-slate-900">Google Drive Files</h2>
+                {driveImages.length > 0 && (
+                  <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-medium">
+                    {driveImages.length}
+                  </span>
+                )}
               </div>
 
-              {/* Action Folder Links & Tabs */}
-              <div className="flex items-center gap-2 flex-wrap">
-                {order.orderFolder && (
-                  <a
-                    href={order.orderFolder}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 rounded-xl text-xs font-semibold transition-colors"
-                  >
-                    <FolderOpen className="w-3.5 h-3.5" />
-                    Open Order Folder
-                    <ExternalLink className="w-3 h-3 opacity-60" />
-                  </a>
-                )}
-
-                {(order.digitizedFolder || detectedDigitizedFolderUrl) && (
-                  <a
-                    href={order.digitizedFolder || detectedDigitizedFolderUrl || '#'}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200 rounded-xl text-xs font-semibold transition-colors"
-                  >
-                    <FolderOpen className="w-3.5 h-3.5" />
-                    Open Digitized Folder
-                    <ExternalLink className="w-3 h-3 opacity-60" />
-                  </a>
-                )}
-
-                {/* Tabs */}
-                <div className="flex bg-slate-100 p-1 rounded-xl gap-1 text-xs font-semibold ml-1">
-                  <button
-                    onClick={() => setActiveDriveTab('artwork')}
-                    className={`px-3 py-1 rounded-lg transition-all ${
-                      activeDriveTab === 'artwork'
-                        ? 'bg-white text-blue-700 shadow-xs'
-                        : 'text-slate-500 hover:text-slate-800'
-                    }`}
-                  >
-                    Artwork ({driveImages.length})
-                  </button>
-                  <button
-                    onClick={() => setActiveDriveTab('digitized')}
-                    className={`px-3 py-1 rounded-lg transition-all ${
-                      activeDriveTab === 'digitized'
-                        ? 'bg-white text-purple-700 shadow-xs'
-                        : 'text-slate-500 hover:text-slate-800'
-                    }`}
-                  >
-                    Digitized Files ({digitizedDriveFiles.length})
-                  </button>
-                </div>
-              </div>
+              {/* Action Folder Link */}
+              {order.orderFolder && (
+                <a
+                  href={order.orderFolder}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 rounded-xl text-xs font-semibold transition-colors"
+                >
+                  <FolderOpen className="w-3.5 h-3.5" />
+                  Open Order Folder
+                  <ExternalLink className="w-3 h-3 opacity-60" />
+                </a>
+              )}
             </div>
 
             <div className="p-4">
@@ -762,119 +739,60 @@ export default function OrderDetailPage() {
                   <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
                   <span className="ml-2 text-sm text-slate-400">Loading files from Drive...</span>
                 </div>
-              ) : activeDriveTab === 'artwork' ? (
-                driveImages.length === 0 ? (
-                  <div className="py-10 text-center text-slate-400">
-                    <Image className="w-10 h-10 mx-auto mb-2 text-slate-300" />
-                    <p className="text-sm">No customer artwork found in main folder</p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                    {driveImages.map((img) => (
-                      <div
-                        key={img.id}
-                        className="group relative bg-slate-50 rounded-xl border border-slate-200 overflow-hidden hover:border-blue-300 hover:shadow-md transition-all cursor-pointer"
-                        onClick={() => setSelectedImage(img)}
-                      >
-                        <div className="aspect-square flex items-center justify-center p-2">
-                          {img.thumbnailUrl ? (
-                            <img
-                              src={img.thumbnailUrl}
-                              alt={img.name}
-                              className="max-w-full max-h-full object-contain rounded-lg"
-                            />
-                          ) : (
-                            <Image className="w-10 h-10 text-slate-300" />
-                          )}
-                        </div>
-                        <div className="px-2.5 pb-2.5">
-                          <p className="text-xs text-slate-600 truncate font-medium" title={img.name}>
-                            {img.name}
-                          </p>
-                          <div className="flex items-center gap-1.5 mt-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <a
-                              href={img.downloadUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              onClick={(e) => e.stopPropagation()}
-                              className="flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-700 rounded-md text-[10px] font-medium hover:bg-blue-100 transition-colors"
-                            >
-                              <Download className="w-3 h-3" />
-                              Download
-                            </a>
-                            <a
-                              href={img.viewUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              onClick={(e) => e.stopPropagation()}
-                              className="flex items-center gap-1 px-2 py-1 bg-slate-100 text-slate-600 rounded-md text-[10px] font-medium hover:bg-slate-200 transition-colors"
-                            >
-                              <ExternalLink className="w-3 h-3" />
-                              Open
-                            </a>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )
+              ) : driveImages.length === 0 ? (
+                <div className="py-10 text-center text-slate-400">
+                  <Image className="w-10 h-10 mx-auto mb-2 text-slate-300" />
+                  <p className="text-sm">No artwork or files found in the order folder</p>
+                </div>
               ) : (
-                digitizedDriveFiles.length === 0 ? (
-                  <div className="py-10 text-center text-slate-400">
-                    <Scan className="w-10 h-10 mx-auto mb-2 text-purple-300" />
-                    <p className="text-sm font-medium text-slate-600 mb-1">No files in Digitized Files subfolder</p>
-                    <p className="text-xs text-slate-400">Upload DST/PES or digitized logos in Google Drive</p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                    {digitizedDriveFiles.map((img) => (
-                      <div
-                        key={img.id}
-                        className="group relative bg-purple-50/40 rounded-xl border border-purple-200 overflow-hidden hover:border-purple-300 hover:shadow-md transition-all cursor-pointer"
-                        onClick={() => setSelectedImage(img)}
-                      >
-                        <div className="aspect-square flex items-center justify-center p-2">
-                          {img.thumbnailUrl ? (
-                            <img
-                              src={img.thumbnailUrl}
-                              alt={img.name}
-                              className="max-w-full max-h-full object-contain rounded-lg"
-                            />
-                          ) : (
-                            <Scan className="w-10 h-10 text-purple-400" />
-                          )}
-                        </div>
-                        <div className="px-2.5 pb-2.5">
-                          <p className="text-xs text-purple-900 truncate font-medium" title={img.name}>
-                            {img.name}
-                          </p>
-                          <div className="flex items-center gap-1.5 mt-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <a
-                              href={img.downloadUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              onClick={(e) => e.stopPropagation()}
-                              className="flex items-center gap-1 px-2 py-1 bg-purple-100 text-purple-800 rounded-md text-[10px] font-medium hover:bg-purple-200 transition-colors"
-                            >
-                              <Download className="w-3 h-3" />
-                              Download
-                            </a>
-                            <a
-                              href={img.viewUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              onClick={(e) => e.stopPropagation()}
-                              className="flex items-center gap-1 px-2 py-1 bg-slate-100 text-slate-600 rounded-md text-[10px] font-medium hover:bg-slate-200 transition-colors"
-                            >
-                              <ExternalLink className="w-3 h-3" />
-                              Open
-                            </a>
-                          </div>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  {driveImages.map((img) => (
+                    <div
+                      key={img.id}
+                      className="group relative bg-slate-50 rounded-xl border border-slate-200 overflow-hidden hover:border-blue-300 hover:shadow-md transition-all cursor-pointer"
+                      onClick={() => setSelectedImage(img)}
+                    >
+                      <div className="aspect-square flex items-center justify-center p-2">
+                        {img.thumbnailUrl ? (
+                          <img
+                            src={img.thumbnailUrl}
+                            alt={img.name}
+                            className="max-w-full max-h-full object-contain rounded-lg"
+                          />
+                        ) : (
+                          <Image className="w-10 h-10 text-slate-300" />
+                        )}
+                      </div>
+                      <div className="px-2.5 pb-2.5">
+                        <p className="text-xs text-slate-600 truncate font-medium" title={img.name}>
+                          {img.name}
+                        </p>
+                        <div className="flex items-center gap-1.5 mt-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <a
+                            href={img.downloadUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-700 rounded-md text-[10px] font-medium hover:bg-blue-100 transition-colors"
+                          >
+                            <Download className="w-3 h-3" />
+                            Download
+                          </a>
+                          <a
+                            href={img.viewUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="flex items-center gap-1 px-2 py-1 bg-slate-100 text-slate-600 rounded-md text-[10px] font-medium hover:bg-slate-200 transition-colors"
+                          >
+                            <ExternalLink className="w-3 h-3" />
+                            Open
+                          </a>
                         </div>
                       </div>
-                    ))}
-                  </div>
-                )
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
           </div>
@@ -964,16 +882,6 @@ export default function OrderDetailPage() {
 
           {/* Activity Audit Trail */}
           <OrderActivityTimeline orderNumber={order.orderNumber} order={order} />
-
-          {/* Original Order Email Viewer (Owner Only — Right Sidebar Scrollable Canvas) */}
-          {!isDigitizer && (
-            <OrderEmailViewer
-              orderNumber={order.orderNumber}
-              orderEmailText={order.orderEmail}
-              customerName={order.customerName}
-              customerEmail={order.customerEmail}
-            />
-          )}
         </div>
       </div>
 
@@ -1024,7 +932,6 @@ export default function OrderDetailPage() {
         <OrderLandscapeModal
           order={order}
           driveImages={driveImages}
-          digitizedFiles={digitizedDriveFiles}
           isOpen={isLandscapeModalOpen}
           onClose={() => setIsLandscapeModalOpen(false)}
         />

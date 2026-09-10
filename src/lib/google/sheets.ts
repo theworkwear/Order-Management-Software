@@ -105,7 +105,7 @@ export async function getAllRows(accessToken: string | undefined, spreadsheetId:
   const sheets = getSheetsClient(accessToken);
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId,
-    range: `'${sheetName}'!A2:BR`,  // Row 2 onwards (skip header), up to column BR (70 cols)
+    range: `'${sheetName}'!A2:BZ`,  // Row 2 onwards, fetching all columns including products and Logo Details (BU)
     valueRenderOption: 'FORMATTED_VALUE',
   });
   return (response.data.values as string[][]) || [];
@@ -143,35 +143,32 @@ function extractUrlFromCell(cell: any): string {
   return '';
 }
 
-// Fetch hyperlink URLs from specific columns (Order Folder & Digitized Folder).
+// Fetch hyperlink URLs from Order Folder column (Column I)
 export async function getHyperlinks(
   accessToken: string | undefined,
   spreadsheetId: string,
   sheetName: string
-): Promise<Map<string, { orderFolderUrl: string; digitizedFolderUrl: string }>> {
+): Promise<Map<string, { orderFolderUrl: string }>> {
   const sheets = getSheetsClient(accessToken);
-  const folderCol = columnToLetter(COLUMN_MAP.orderFolder);     // Column I
-  const digCol = columnToLetter(COLUMN_MAP.digitizedFolder);    // Column J
+  const folderCol = columnToLetter(COLUMN_MAP.orderFolder); // Column I
 
   try {
     const response = await sheets.spreadsheets.get({
       spreadsheetId,
-      ranges: [`'${sheetName}'!${folderCol}2:${digCol}`],
+      ranges: [`'${sheetName}'!${folderCol}2:${folderCol}`],
       fields: 'sheets.data.rowData.values(hyperlink,userEnteredValue,formattedValue,textFormatRuns)',
       includeGridData: true,
     });
 
-    const linksMap = new Map<string, { orderFolderUrl: string; digitizedFolderUrl: string }>();
+    const linksMap = new Map<string, { orderFolderUrl: string }>();
     const rowData = response.data.sheets?.[0]?.data?.[0]?.rowData || [];
 
     for (let i = 0; i < rowData.length; i++) {
       const values = rowData[i]?.values || [];
       const orderFolderUrl = extractUrlFromCell(values[0]);
-      const digitizedFolderUrl = extractUrlFromCell(values[1]);
 
-      if (orderFolderUrl || digitizedFolderUrl) {
-        // Key by data row index (0-based, same as used in parseRowToOrder)
-        linksMap.set(i.toString(), { orderFolderUrl, digitizedFolderUrl });
+      if (orderFolderUrl) {
+        linksMap.set(i.toString(), { orderFolderUrl });
       }
     }
     return linksMap;
@@ -186,10 +183,11 @@ export async function getHyperlinks(
 // ============================================
 
 export function parseRowToOrder(row: string[], rowIndex: number): Order {
-  // Pad the row to ensure all product columns are accessible.
-  // Google Sheets API trims trailing empty cells, which can cut off products
-  // at higher column indices if later columns are empty.
-  const expectedLength = COLUMN_MAP.productsStart + COLUMN_MAP.maxProducts * COLUMN_MAP.fieldsPerProduct;
+  // Pad the row to ensure all product columns and logoDetails are accessible.
+  const expectedLength = Math.max(
+    COLUMN_MAP.productsStart + COLUMN_MAP.maxProducts * COLUMN_MAP.fieldsPerProduct,
+    COLUMN_MAP.logoDetails + 1
+  );
   const paddedRow = [...row];
   while (paddedRow.length < expectedLength) {
     paddedRow.push('');
@@ -226,7 +224,7 @@ export function parseRowToOrder(row: string[], rowIndex: number): Order {
     shippingAddress: paddedRow[COLUMN_MAP.shippingAddress] || '',
     total: paddedRow[COLUMN_MAP.total] || '',
     orderFolder: paddedRow[COLUMN_MAP.orderFolder] || '',
-    digitizedFolder: paddedRow[COLUMN_MAP.digitizedFolder] || '',
+    logoDetails: (paddedRow[COLUMN_MAP.logoDetails] || '').trim().toLowerCase() === 'open digitized' ? '' : (paddedRow[COLUMN_MAP.logoDetails] || ''),
     orderEmail: paddedRow[COLUMN_MAP.orderEmail] || '',
     processedAt: paddedRow[COLUMN_MAP.processedAt] || '',
     products,
@@ -250,9 +248,8 @@ export async function fetchAllOrders(accessToken: string | undefined, spreadshee
       const order = parseRowToOrder(row, idx);
       // Replace display text with actual hyperlink URLs
       const links = hyperlinks.get(idx.toString());
-      if (links) {
-        if (links.orderFolderUrl) order.orderFolder = links.orderFolderUrl;
-        if (links.digitizedFolderUrl) order.digitizedFolder = links.digitizedFolderUrl;
+      if (links && links.orderFolderUrl) {
+        order.orderFolder = links.orderFolderUrl;
       }
       return order;
     })
@@ -347,7 +344,8 @@ export async function updateOrderFields(
     shippingAddress: COLUMN_MAP.shippingAddress,
     total: COLUMN_MAP.total,
     orderFolder: COLUMN_MAP.orderFolder,
-    digitizedFolder: COLUMN_MAP.digitizedFolder,
+    logoDetails: COLUMN_MAP.logoDetails,
+    orderEmail: COLUMN_MAP.orderEmail,
     processedAt: COLUMN_MAP.processedAt,
   };
 
@@ -374,7 +372,7 @@ export interface NewOrderData {
   shippingAddress?: string;
   total?: string;
   orderFolder?: string;
-  digitizedFolder?: string;
+  logoDetails?: string;
   orderEmail?: string;
   processedAt?: string;
   products?: {
@@ -394,7 +392,10 @@ export async function appendOrderRow(
   orderData: NewOrderData
 ): Promise<void> {
   const sheets = getSheetsClient(accessToken);
-  const totalCols = COLUMN_MAP.productsStart + COLUMN_MAP.maxProducts * COLUMN_MAP.fieldsPerProduct;
+  const totalCols = Math.max(
+    COLUMN_MAP.productsStart + COLUMN_MAP.maxProducts * COLUMN_MAP.fieldsPerProduct,
+    COLUMN_MAP.logoDetails + 1
+  );
   const rowValues: string[] = new Array(totalCols).fill('');
 
   rowValues[COLUMN_MAP.orderNumber] = orderData.orderNumber || '';
@@ -406,7 +407,7 @@ export async function appendOrderRow(
   rowValues[COLUMN_MAP.shippingAddress] = orderData.shippingAddress || '';
   rowValues[COLUMN_MAP.total] = orderData.total || '';
   rowValues[COLUMN_MAP.orderFolder] = orderData.orderFolder || '';
-  rowValues[COLUMN_MAP.digitizedFolder] = orderData.digitizedFolder || '';
+  rowValues[COLUMN_MAP.logoDetails] = orderData.logoDetails || '';
   rowValues[COLUMN_MAP.orderEmail] = orderData.orderEmail || '';
   rowValues[COLUMN_MAP.processedAt] = orderData.processedAt || '';
 

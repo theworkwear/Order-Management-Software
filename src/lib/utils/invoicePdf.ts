@@ -159,7 +159,7 @@ export function generateInvoicePdf(order: Order, options?: OrderLandscapeExportO
         }))
       : [
           { name: 'Polos', code: 'UC101', qty: '4', size: 'L', colour: 'Black', emb: 'LB / B' },
-          { name: 'Hoodies', code: 'TRA628', qty: '1', size: 'L', colour: 'Black', emb: 'LB / B' },
+          { name: 'Hoodies', code: 'UX4', qty: '1', size: 'L', colour: 'Black', emb: 'LB / B' },
           { name: 'Jackets', code: 'TRA628', qty: '1', size: 'L', colour: 'Black', emb: 'LB / B' },
         ];
 
@@ -219,6 +219,7 @@ export function generateInvoicePdf(order: Order, options?: OrderLandscapeExportO
     const logoBoxWidth = 16;
     const logoBoxHeight = 16;
     const logoBoxGap = 4;
+    const logoImgTopY = artworkStartY + 2.5;
 
     if (allLogoB64s.length > 0) {
       allLogoB64s.forEach((imgData, idx) => {
@@ -231,45 +232,47 @@ export function generateInvoicePdf(order: Order, options?: OrderLandscapeExportO
             } else if (imgData.startsWith('data:image/webp')) {
               format = 'WEBP';
             }
-            doc.addImage(imgData, format, imgX, artworkStartY + 2, logoBoxWidth, logoBoxHeight, undefined, 'FAST');
+            doc.addImage(imgData, format, imgX, logoImgTopY, logoBoxWidth, logoBoxHeight, undefined, 'FAST');
           } catch (e) {
             console.warn('Could not render logo image in PDF:', e);
             doc.setFillColor(241, 245, 249);
-            doc.roundedRect(imgX, artworkStartY + 2, logoBoxWidth, logoBoxHeight, 2, 2, 'F');
+            doc.roundedRect(imgX, logoImgTopY, logoBoxWidth, logoBoxHeight, 2, 2, 'F');
             doc.setDrawColor(203, 213, 225);
             doc.setLineWidth(0.2);
-            doc.roundedRect(imgX, artworkStartY + 2, logoBoxWidth, logoBoxHeight, 2, 2, 'S');
+            doc.roundedRect(imgX, logoImgTopY, logoBoxWidth, logoBoxHeight, 2, 2, 'S');
           }
         }
       });
     } else {
       // Draw subtle circular / rounded logo emblem placeholder
       doc.setFillColor(241, 245, 249);
-      doc.roundedRect(col1X, artworkStartY + 2, 14, 14, 2, 2, 'F');
+      doc.roundedRect(col1X, logoImgTopY, 14, 14, 2, 2, 'F');
       doc.setDrawColor(203, 213, 225);
       doc.setLineWidth(0.2);
-      doc.roundedRect(col1X, artworkStartY + 2, 14, 14, 2, 2, 'S');
+      doc.roundedRect(col1X, logoImgTopY, 14, 14, 2, 2, 'S');
     }
 
     // ==========================================
-    // 5. Logo Details Box
+    // 5. Logo Details Box (Properly offset below images to prevent overlap)
     // ==========================================
-    const logoDetailsY = artworkStartY + 19;
+    const logoImgBottomY = logoImgTopY + logoBoxHeight;
+    const logoDetailsY = logoImgBottomY + 6; // Clear 6mm spacing below the logo pictures
     doc.setFontSize(7.5);
     doc.setTextColor(100, 116, 139);
     doc.text('LOGO DETAILS', col1X, logoDetailsY);
 
     const boxY = logoDetailsY + 2.5;
-    const boxHeight = 10;
+    const boxHeight = 12;
     doc.setDrawColor(226, 232, 240);
     doc.setLineWidth(0.2);
     doc.roundedRect(col1X, boxY, contentWidth, boxHeight, 1.5, 1.5, 'S');
 
-    doc.setFontSize(8.5);
+    doc.setFontSize(8);
     doc.setTextColor(30, 41, 59);
-    const logoDetailsText = options?.logoDetails || '';
+    const logoDetailsText = options?.logoDetails || order.logoDetails || '';
     if (logoDetailsText.trim()) {
-      doc.text(sanitizePdfString(logoDetailsText), col1X + 3, boxY + 6.5);
+      const splitLines = doc.splitTextToSize(sanitizePdfString(logoDetailsText), contentWidth - 6);
+      doc.text(splitLines, col1X + 3, boxY + 4.5);
     }
 
     // Save and download PDF

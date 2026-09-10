@@ -39,7 +39,7 @@ export default function CreateOrderModal({ isOpen, onClose, onSuccess }: CreateO
   const [shippingAddress, setShippingAddress] = useState('');
   const [total, setTotal] = useState('');
   const [orderFolder, setOrderFolder] = useState('');
-  const [digitizedFolder, setDigitizedFolder] = useState('');
+  const [logoDetails, setLogoDetails] = useState('');
   const [orderEmail, setOrderEmail] = useState('');
 
   const [products, setProducts] = useState<ProductInput[]>([
@@ -57,7 +57,7 @@ export default function CreateOrderModal({ isOpen, onClose, onSuccess }: CreateO
       setShippingAddress('');
       setTotal('');
       setOrderFolder('');
-      setDigitizedFolder('');
+      setLogoDetails('');
       setOrderEmail('');
       setProducts([{ name: '', productCode: '', qty: '1', size: '', colour: '', emb: '' }]);
       setError('');
@@ -120,7 +120,7 @@ export default function CreateOrderModal({ isOpen, onClose, onSuccess }: CreateO
           shippingAddress,
           total,
           orderFolder,
-          digitizedFolder,
+          logoDetails,
           orderEmail,
           products: validProducts,
         }),
@@ -317,12 +317,12 @@ export default function CreateOrderModal({ isOpen, onClose, onSuccess }: CreateO
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Digitized Folder URL</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Logo Details</label>
                 <input
-                  type="url"
-                  value={digitizedFolder}
-                  onChange={(e) => setDigitizedFolder(e.target.value)}
-                  placeholder="https://drive.google.com/drive/folders/..."
+                  type="text"
+                  value={logoDetails}
+                  onChange={(e) => setLogoDetails(e.target.value)}
+                  placeholder="e.g. Left breast embroidery..."
                   className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                 />
               </div>

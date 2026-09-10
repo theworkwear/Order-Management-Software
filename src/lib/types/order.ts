@@ -54,9 +54,10 @@ export interface Order {
   shippingAddress: string;
   total: string;
   orderFolder: string;
-  digitizedFolder: string;
+  logoDetails?: string;
   orderEmail: string;
   processedAt: string;
+  digitizedFolder?: string;
   products: Product[];
   rawRow: string[]; // full raw row data
 }
@@ -100,7 +101,7 @@ export const COLUMN_MAP = {
   shippingAddress: 6,
   total: 7,
   orderFolder: 8,
-  digitizedFolder: 9,
+  logoDetails: 9, // Column J (Index 9, directly after Order Folder)
   orderEmail: 10,
   processedAt: 11,
   // Products start at index 12 (Col M)

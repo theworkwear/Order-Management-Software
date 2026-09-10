@@ -1,5 +1,9 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Project documentation
+
+- [Google Sheets and Drive integration](docs/GOOGLE_INTEGRATION.md) explains why the application uses a Google service-account email and private key, how access works, and how to reproduce the integration in another system.
+
 ## Getting Started
 
 First, run the development server:

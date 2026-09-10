@@ -55,7 +55,7 @@ export default function InvoicesPage() {
     generateInvoicePdf(fakeOrder, {
       profession: '-',
       source: 'Theworkwear Website',
-      logoDetails: '',
+      logoDetails: (invoice as any).logoDetails || '',
     });
   };
 
@@ -269,10 +269,12 @@ export default function InvoicesPage() {
                 </div>
 
                 {/* Logo Details */}
-                <div className="pt-2">
-                  <p className="text-slate-400 uppercase tracking-wider text-[10px] mb-1">LOGO DETAILS</p>
-                  <div className="border border-slate-200 rounded-sm px-3 py-2 text-slate-800 text-xs min-h-[30px]">
-                    {/* Empty */}
+                <div className="pt-3">
+                  <p className="text-slate-400 uppercase tracking-wider text-[10px] mb-1.5">LOGO DETAILS</p>
+                  <div className="border border-slate-200 rounded-sm px-3 py-2 text-slate-800 text-xs min-h-[36px] whitespace-pre-wrap bg-white">
+                    {(previewInvoice as any).logoDetails || (
+                      <span className="text-slate-300 italic">No logo details specified</span>
+                    )}
                   </div>
                 </div>
               </div>

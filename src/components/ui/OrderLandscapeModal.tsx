@@ -81,7 +81,7 @@ export default function OrderLandscapeModal({
     generateInvoicePdf(order, {
       profession: '-',
       source: 'Theworkwear Website',
-      logoDetails: '',
+      logoDetails: order.logoDetails || '',
       logoImagesBase64,
     });
   };
@@ -91,7 +91,7 @@ export default function OrderLandscapeModal({
     ? order.products
     : [
         { index: 1, name: 'Polos', productCode: 'UC101', qty: '4', size: 'L', colour: 'Black', emb: 'LB / B' },
-        { index: 2, name: 'Hoodies', productCode: 'TRA628', qty: '1', size: 'L', colour: 'Black', emb: 'LB / B' },
+        { index: 2, name: 'Hoodies', productCode: 'UX4', qty: '1', size: 'L', colour: 'Black', emb: 'LB / B' },
         { index: 3, name: 'Jackets', productCode: 'TRA628', qty: '1', size: 'L', colour: 'Black', emb: 'LB / B' },
       ];
 
@@ -288,12 +288,16 @@ export default function OrderLandscapeModal({
             </div>
 
             {/* Logo Details Box */}
-            <div className="pt-2">
-              <p className="text-slate-400 font-normal uppercase tracking-wider text-[10px] mb-1">
+            <div className="pt-3">
+              <p className="text-slate-400 font-normal uppercase tracking-wider text-[10px] mb-1.5">
                 LOGO DETAILS
               </p>
-              <div className="border border-slate-200 rounded-sm px-3 py-2 text-slate-800 text-xs min-h-[32px]">
-                {/* Empty */}
+              <div className="border border-slate-200 rounded-sm px-3 py-2 text-slate-800 text-xs min-h-[36px] whitespace-pre-wrap bg-white">
+                {order.logoDetails ? (
+                  order.logoDetails
+                ) : (
+                  <span className="text-slate-300 italic">No logo details specified</span>
+                )}
               </div>
             </div>
           </div>

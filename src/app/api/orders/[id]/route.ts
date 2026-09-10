@@ -89,7 +89,7 @@ export async function PATCH(
         shippingAddress: COLUMN_MAP.shippingAddress,
         total: COLUMN_MAP.total,
         orderFolder: COLUMN_MAP.orderFolder,
-        digitizedFolder: COLUMN_MAP.digitizedFolder,
+        logoDetails: COLUMN_MAP.logoDetails,
         orderEmail: COLUMN_MAP.orderEmail,
         processedAt: COLUMN_MAP.processedAt,
       };

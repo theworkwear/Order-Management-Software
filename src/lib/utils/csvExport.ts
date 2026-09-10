@@ -28,7 +28,7 @@ export function exportOrdersToCsv(orders: Order[], filename: string = 'Orders-Ex
     'Product Count',
     'Products List Summary',
     'Order Folder URL',
-    'Digitized Folder URL',
+    'Logo Details',
     'Processed At',
   ];
 
@@ -51,7 +51,7 @@ export function exportOrdersToCsv(orders: Order[], filename: string = 'Orders-Ex
       o.products.length,
       productSummary,
       o.orderFolder || '',
-      o.digitizedFolder || '',
+      o.logoDetails || '',
       o.processedAt || '',
     ];
 

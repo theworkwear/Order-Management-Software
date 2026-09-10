@@ -117,14 +117,6 @@ export default function DispatchDateCard({
           </div>
         )}
       </div>
-
-      {/* Logic explanation footer */}
-      <div className="flex items-start gap-2 pt-1 border-t border-slate-100 text-[11px] text-slate-500">
-        <Calendar className="w-3.5 h-3.5 text-indigo-500 mt-0.5 shrink-0" />
-        <span>
-          Calculated by adding <strong className="text-slate-700">10 working days</strong> from the order date ({orderDate || 'N/A'}). Saturdays &amp; Sundays are automatically excluded.
-        </span>
-      </div>
     </div>
   );
 }
