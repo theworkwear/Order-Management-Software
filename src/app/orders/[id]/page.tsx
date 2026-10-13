@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import StatusBadge from '@/components/ui/StatusBadge';
-import { Order, OrderStatus, ORDER_STATUSES } from '@/lib/types/order';
+import { Order, OrderStatus, ORDER_STATUSES, COLUMN_MAP } from '@/lib/types/order';
 import { generateInvoicePdf } from '@/lib/utils/invoicePdf';
 import OrderLandscapeModal from '@/components/ui/OrderLandscapeModal';
 import {
@@ -214,8 +214,8 @@ export default function OrderDetailPage() {
   };
 
   const handleAddProductItem = () => {
-    if (editProducts.length >= 10) {
-      setError('Maximum 10 products permitted per order');
+    if (editProducts.length >= COLUMN_MAP.maxProducts) {
+      setError(`Maximum ${COLUMN_MAP.maxProducts} products permitted per order`);
       return;
     }
     setEditProducts([

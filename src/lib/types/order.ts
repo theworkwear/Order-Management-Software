@@ -34,7 +34,7 @@ export const STATUS_CONFIG: Record<OrderStatus, { label: string; color: string; 
 };
 
 export interface Product {
-  index: number; // 1-10
+  index: number; // 1-50
   name: string;
   productCode: string;
   qty: string;
@@ -108,10 +108,10 @@ export const COLUMN_MAP = {
   // Each product has 6 columns: Product, Product Code, QTY, Size, Colour, EMB
   productsStart: 12,
   fieldsPerProduct: 6,
-  maxProducts: 10,
+  maxProducts: 50,
 } as const;
 
 export function getProductColumnIndex(productIndex: number, fieldOffset: number): number {
-  // productIndex: 1-10, fieldOffset: 0=Product, 1=Code, 2=QTY, 3=Size, 4=Colour, 5=EMB
+  // productIndex: 1-50, fieldOffset: 0=Product, 1=Code, 2=QTY, 3=Size, 4=Colour, 5=EMB
   return COLUMN_MAP.productsStart + (productIndex - 1) * COLUMN_MAP.fieldsPerProduct + fieldOffset;
 }

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { X, Plus, Trash2, Package, User, MapPin, Link2, DollarSign, Loader2, CheckCircle } from 'lucide-react';
-import { OrderStatus, ORDER_STATUSES } from '@/lib/types/order';
+import { OrderStatus, ORDER_STATUSES, COLUMN_MAP } from '@/lib/types/order';
 import ProductSelect from '@/components/ui/ProductSelect';
 import { addActivityLog } from '@/lib/store/activityLog';
 
@@ -68,8 +68,8 @@ export default function CreateOrderModal({ isOpen, onClose, onSuccess }: CreateO
   if (!isOpen) return null;
 
   const handleAddProduct = () => {
-    if (products.length >= 10) {
-      setError('Maximum 10 products permitted per order in spreadsheet.');
+    if (products.length >= COLUMN_MAP.maxProducts) {
+      setError(`Maximum ${COLUMN_MAP.maxProducts} products permitted per order in spreadsheet.`);
       return;
     }
     setProducts([...products, { name: '', productCode: '', qty: '1', size: '', colour: '', emb: '' }]);

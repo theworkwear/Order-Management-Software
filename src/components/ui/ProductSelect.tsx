@@ -9,7 +9,7 @@ import {
   searchProductCatalog,
   getPresetsByCategory,
 } from '@/lib/types/catalog';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, Layers, ArrowRight } from 'lucide-react';
 
 interface ProductSelectProps {
   name: string;

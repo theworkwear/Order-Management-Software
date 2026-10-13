@@ -126,7 +126,7 @@ export async function PATCH(
         } else {
           // Patch specific products by index
           for (const product of body.products) {
-            if (product.index >= 1 && product.index <= 10) {
+            if (product.index >= 1 && product.index <= COLUMN_MAP.maxProducts) {
               const fields = ['name', 'productCode', 'qty', 'size', 'colour', 'emb'];
               const offsets = [0, 1, 2, 3, 4, 5];
               

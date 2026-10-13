@@ -103,9 +103,11 @@ export async function getHeaders(accessToken: string | undefined, spreadsheetId:
 
 export async function getAllRows(accessToken: string | undefined, spreadsheetId: string, sheetName: string): Promise<string[][]> {
   const sheets = getSheetsClient(accessToken);
+  const maxColIndex = COLUMN_MAP.productsStart + COLUMN_MAP.maxProducts * COLUMN_MAP.fieldsPerProduct - 1;
+  const maxColLetter = columnToLetter(maxColIndex);
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId,
-    range: `'${sheetName}'!A2:BZ`,  // Row 2 onwards, fetching all columns including products and Logo Details (BU)
+    range: `'${sheetName}'!A2:${maxColLetter}`,  // Row 2 onwards, fetching all columns dynamically up to maxProducts (KZ for 50 products)
     valueRenderOption: 'FORMATTED_VALUE',
   });
   return (response.data.values as string[][]) || [];
