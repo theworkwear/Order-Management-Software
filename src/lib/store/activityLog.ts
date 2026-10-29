@@ -12,7 +12,7 @@ export interface ActivityItem {
   details?: string;
   user?: string;
   timestamp: string;
-  type: 'created' | 'status_change' | 'edited' | 'file_upload' | 'digitized';
+  type: 'created' | 'status_change' | 'edited' | 'file_upload' | 'digitized' | 'deleted';
 }
 
 const STORAGE_KEY = 'tww_activity_logs';
@@ -56,7 +56,7 @@ export function addActivityLog(entry: {
   action: string;
   details?: string;
   user?: string;
-  type: 'created' | 'status_change' | 'edited' | 'file_upload' | 'digitized';
+  type: 'created' | 'status_change' | 'edited' | 'file_upload' | 'digitized' | 'deleted';
 }): ActivityItem {
   const logs = getStoredLogs();
   const newItem: ActivityItem = {

@@ -157,6 +157,11 @@
     color: #15803d;
     border: 1px solid #bbf7d0;
   }
+  .status-cancelled {
+    background-color: #fef2f2;
+    color: #b91c1c;
+    border: 1px solid #fecaca;
+  }
 
   /* Button styles */
   .btn-primary {

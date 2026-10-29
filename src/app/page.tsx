@@ -7,7 +7,7 @@ import StatusBadge from '@/components/ui/StatusBadge';
 import { 
   Package, Clock, Hammer, Scan, CheckCircle2, 
   TrendingUp, RefreshCw, ArrowRight, DollarSign,
-  CalendarDays, Eye, Plus
+  CalendarDays, Eye, Plus, XCircle
 } from 'lucide-react';
 import CreateOrderModal from '@/components/ui/CreateOrderModal';
 import DispatchDateCard from '@/components/ui/DispatchDateCard';
@@ -71,8 +71,8 @@ export default function DashboardPage() {
             <div className="h-4 w-64 skeleton rounded-lg mt-2" />
           </div>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-          {[...Array(5)].map((_, i) => (
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          {[...Array(6)].map((_, i) => (
             <div key={i} className="h-28 skeleton rounded-xl" />
           ))}
         </div>
@@ -105,6 +105,7 @@ export default function DashboardPage() {
     { label: 'Being Made', value: stats?.beingMade || 0, icon: Hammer, color: 'from-yellow-500 to-amber-500', textColor: 'text-yellow-600' },
     { label: 'Digitized', value: stats?.digitized || 0, icon: Scan, color: 'from-purple-500 to-violet-500', textColor: 'text-purple-600' },
     { label: 'Done', value: stats?.done || 0, icon: CheckCircle2, color: 'from-green-500 to-emerald-500', textColor: 'text-green-600' },
+    { label: 'Cancelled', value: stats?.cancelled || 0, icon: XCircle, color: 'from-red-500 to-rose-600', textColor: 'text-red-600' },
   ];
 
   return (
@@ -143,7 +144,7 @@ export default function DashboardPage() {
 
       {/* Stat Cards */}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         {statCards.map((card) => (
           <div key={card.label} className="stat-card bg-white rounded-xl border border-slate-100 p-5 shadow-sm">
             <div className="flex items-center justify-between mb-3">

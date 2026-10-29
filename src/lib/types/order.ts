@@ -2,9 +2,9 @@
 // Order Types
 // ============================================
 
-export type OrderStatus = 'Pending' | 'Being Made' | 'Digitized' | 'Done';
+export type OrderStatus = 'Pending' | 'Being Made' | 'Digitized' | 'Done' | 'Cancelled';
 
-export const ORDER_STATUSES: OrderStatus[] = ['Pending', 'Being Made', 'Digitized', 'Done'];
+export const ORDER_STATUSES: OrderStatus[] = ['Pending', 'Being Made', 'Digitized', 'Done', 'Cancelled'];
 
 export const STATUS_CONFIG: Record<OrderStatus, { label: string; color: string; bgColor: string; borderColor: string }> = {
   'Pending': {
@@ -30,6 +30,12 @@ export const STATUS_CONFIG: Record<OrderStatus, { label: string; color: string; 
     color: 'text-green-700',
     bgColor: 'bg-green-50',
     borderColor: 'border-green-200',
+  },
+  'Cancelled': {
+    label: 'Cancelled',
+    color: 'text-red-700',
+    bgColor: 'bg-red-50',
+    borderColor: 'border-red-200',
   },
 };
 
@@ -86,6 +92,7 @@ export interface DashboardStats {
   beingMade: number;
   digitized: number;
   done: number;
+  cancelled: number;
   monthlySales: MonthlySales[];
   recentOrders: Order[];
 }

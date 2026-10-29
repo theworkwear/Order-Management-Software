@@ -213,13 +213,25 @@ export function parseRowToOrder(row: string[], rowIndex: number): Order {
     }
   }
 
-  const status = (paddedRow[COLUMN_MAP.status] || 'Pending') as OrderStatus;
+  const rawStatus = (paddedRow[COLUMN_MAP.status] || '').trim();
+  let status: OrderStatus = 'Pending';
+  if (/^cancelled$/i.test(rawStatus)) {
+    status = 'Cancelled';
+  } else if (/^digitized$/i.test(rawStatus)) {
+    status = 'Digitized';
+  } else if (/^being made$/i.test(rawStatus)) {
+    status = 'Being Made';
+  } else if (/^done$/i.test(rawStatus)) {
+    status = 'Done';
+  } else if (/^pending$/i.test(rawStatus)) {
+    status = 'Pending';
+  }
 
   return {
     rowIndex: rowIndex + 2, // +2 because row 1 is header, data starts row 2, and rowIndex is 0-based
     orderNumber: paddedRow[COLUMN_MAP.orderNumber] || '',
     orderDate: paddedRow[COLUMN_MAP.orderDate] || '',
-    status: (['Pending', 'Being Made', 'Digitized', 'Done'].includes(status)) ? status : 'Pending',
+    status,
     customerName: paddedRow[COLUMN_MAP.customerName] || '',
     customerEmail: paddedRow[COLUMN_MAP.customerEmail] || '',
     customerPhone: paddedRow[COLUMN_MAP.customerPhone] || '',
@@ -435,4 +447,47 @@ export async function appendOrderRow(
     },
   });
 }
+
+// ============================================
+// Delete Order Row
+// ============================================
+
+export async function deleteOrderRow(
+  accessToken: string | undefined,
+  spreadsheetId: string,
+  sheetName: string,
+  rowNumber: number
+): Promise<void> {
+  const sheets = getSheetsClient(accessToken);
+
+  // Fetch sheet properties to obtain numeric sheetId
+  const spreadsheet = await sheets.spreadsheets.get({
+    spreadsheetId,
+    fields: 'sheets(properties(sheetId,title))',
+  });
+
+  const sheet = spreadsheet.data.sheets?.find(s => s.properties?.title === sheetName) || spreadsheet.data.sheets?.[0];
+  const sheetId = sheet?.properties?.sheetId ?? 0;
+
+  // Google Sheets deleteDimension uses 0-based indices.
+  // rowNumber is 1-based (e.g. row 2 is index 1)
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId,
+    requestBody: {
+      requests: [
+        {
+          deleteDimension: {
+            range: {
+              sheetId,
+              dimension: 'ROWS',
+              startIndex: rowNumber - 1,
+              endIndex: rowNumber,
+            },
+          },
+        },
+      ],
+    },
+  });
+}
+
 

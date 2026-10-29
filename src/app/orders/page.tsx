@@ -2,11 +2,12 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import { OrderStatus, ORDER_STATUSES, Order } from '@/lib/types/order';
 import {
   Search, Filter, ChevronUp, ChevronDown, ChevronLeft, ChevronRight,
-  Eye, Package, ArrowUpDown, X, RefreshCw, Loader2, CheckCircle, AlertCircle, Plus
+  Eye, Package, ArrowUpDown, X, RefreshCw, Loader2, CheckCircle, AlertCircle, Plus, Trash2
 } from 'lucide-react';
 import CreateOrderModal from '@/components/ui/CreateOrderModal';
 import DispatchDateCard from '@/components/ui/DispatchDateCard';
@@ -14,6 +15,10 @@ import DispatchDateCard from '@/components/ui/DispatchDateCard';
 
 export default function OrdersPage() {
   const router = useRouter();
+  const { data: session } = useSession();
+  const role = (session as any)?.role || (session?.user as any)?.role || 'admin';
+  const isDigitizer = role === 'digitizer';
+
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -26,6 +31,8 @@ export default function OrdersPage() {
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [statusUpdatingRow, setStatusUpdatingRow] = useState<string | null>(null);
+  const [orderToDelete, setOrderToDelete] = useState<Order | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const perPage = 20;
 
@@ -108,6 +115,31 @@ export default function OrdersPage() {
 
   const handleRowClick = (orderNumber: string) => {
     router.push(`/orders/${encodeURIComponent(orderNumber)}`);
+  };
+
+  const handleDeleteOrder = async () => {
+    if (!orderToDelete) return;
+    setDeleting(true);
+    setError('');
+    setSuccessMsg('');
+    try {
+      const res = await fetch(`/api/orders/${encodeURIComponent(orderToDelete.orderNumber)}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to delete order');
+      }
+      setOrders(prev => prev.filter(o => o.orderNumber !== orderToDelete.orderNumber));
+      setTotalCount(prev => Math.max(0, prev - 1));
+      setSuccessMsg(`Order #${orderToDelete.orderNumber} deleted successfully ✓`);
+      setTimeout(() => setSuccessMsg(''), 4000);
+      setOrderToDelete(null);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setDeleting(false);
+    }
   };
 
   const formatTotal = (totalStr: string) => {
@@ -253,7 +285,7 @@ export default function OrdersPage() {
                 </div>
               )}
 
-              <div className="flex items-center justify-between pt-2 border-t border-slate-50" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between pt-2 border-t border-slate-50 gap-2" onClick={(e) => e.stopPropagation()}>
                 <select
                   value={order.status}
                   onChange={(e) => handleStatusChange(order, e.target.value as OrderStatus, e)}
@@ -262,6 +294,7 @@ export default function OrdersPage() {
                     order.status === 'Pending' ? 'bg-amber-50 text-amber-700 border-amber-200' :
                     order.status === 'Being Made' ? 'bg-yellow-50 text-yellow-700 border-yellow-200' :
                     order.status === 'Digitized' ? 'bg-purple-50 text-purple-700 border-purple-200' :
+                    order.status === 'Cancelled' ? 'bg-red-50 text-red-700 border-red-200' :
                     'bg-green-50 text-green-700 border-green-200'
                   }`}
                 >
@@ -270,13 +303,28 @@ export default function OrdersPage() {
                   ))}
                 </select>
 
-                <Link
-                  href={`/orders/${encodeURIComponent(order.orderNumber)}`}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-xs font-medium"
-                >
-                  <Eye className="w-3.5 h-3.5" />
-                  View Details
-                </Link>
+                <div className="flex items-center gap-1.5">
+                  <Link
+                    href={`/orders/${encodeURIComponent(order.orderNumber)}`}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-xs font-medium"
+                  >
+                    <Eye className="w-3.5 h-3.5" />
+                    View Details
+                  </Link>
+                  {!isDigitizer && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setOrderToDelete(order);
+                      }}
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-red-50 text-red-600 rounded-lg text-xs font-medium hover:bg-red-100 transition-colors"
+                      title="Delete Order"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Delete</span>
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           ))
@@ -387,6 +435,7 @@ export default function OrdersPage() {
                             order.status === 'Pending' ? 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100' :
                             order.status === 'Being Made' ? 'bg-yellow-50 text-yellow-700 border-yellow-200 hover:bg-yellow-100' :
                             order.status === 'Digitized' ? 'bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100' :
+                            order.status === 'Cancelled' ? 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100' :
                             'bg-green-50 text-green-700 border-green-200 hover:bg-green-100'
                           }`}
                         >
@@ -401,13 +450,28 @@ export default function OrdersPage() {
                       </div>
                     </td>
                     <td className="px-5 py-3.5" onClick={(e) => e.stopPropagation()}>
-                      <Link
-                        href={`/orders/${encodeURIComponent(order.orderNumber)}`}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-xs font-medium hover:bg-blue-100 transition-colors"
-                      >
-                        <Eye className="w-3.5 h-3.5" />
-                        View
-                      </Link>
+                      <div className="flex items-center gap-1.5">
+                        <Link
+                          href={`/orders/${encodeURIComponent(order.orderNumber)}`}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-xs font-medium hover:bg-blue-100 transition-colors"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          View
+                        </Link>
+                        {!isDigitizer && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setOrderToDelete(order);
+                            }}
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-red-50 text-red-600 rounded-lg text-xs font-medium hover:bg-red-100 transition-colors"
+                            title="Delete Order"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span className="hidden xl:inline">Delete</span>
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -467,6 +531,43 @@ export default function OrdersPage() {
         onClose={() => setIsCreateModalOpen(false)}
         onSuccess={fetchOrders}
       />
+
+      {/* Delete Confirmation Modal */}
+      {orderToDelete && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-slate-100 p-6 space-y-4 fade-in">
+            <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto">
+              <Trash2 className="w-6 h-6" />
+            </div>
+            <div className="text-center">
+              <h3 className="text-lg font-bold text-slate-900">Delete Order #{orderToDelete.orderNumber}?</h3>
+              <p className="text-sm text-slate-500 mt-2">
+                Are you sure you want to permanently delete this order for{' '}
+                <span className="font-semibold text-slate-700">{orderToDelete.customerName || 'Customer'}</span>? This will remove the row from Google Sheets and cannot be undone.
+              </p>
+            </div>
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setOrderToDelete(null)}
+                disabled={deleting}
+                className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 text-sm font-medium transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteOrder}
+                disabled={deleting}
+                className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-semibold shadow-sm transition-colors flex items-center gap-2"
+              >
+                {deleting && <Loader2 className="w-4 h-4 animate-spin" />}
+                {deleting ? 'Deleting...' : 'Delete Order'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

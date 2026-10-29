@@ -18,7 +18,7 @@ export async function GET() {
 
     if (!spreadsheetId) {
       return NextResponse.json({
-        total: 0, pending: 0, beingMade: 0, digitized: 0, done: 0,
+        total: 0, pending: 0, beingMade: 0, digitized: 0, done: 0, cancelled: 0,
         monthlySales: [], recentOrders: [],
       });
     }
@@ -30,6 +30,7 @@ export async function GET() {
     const beingMade = orders.filter(o => o.status === 'Being Made').length;
     const digitized = orders.filter(o => o.status === 'Digitized').length;
     const done = orders.filter(o => o.status === 'Done').length;
+    const cancelled = orders.filter(o => o.status === 'Cancelled').length;
 
     // Monthly sales calculation
     const monthlyMap = new Map<string, { totalSales: number; orderCount: number }>();
@@ -79,6 +80,7 @@ export async function GET() {
       beingMade,
       digitized,
       done,
+      cancelled,
       monthlySales,
       recentOrders,
     });

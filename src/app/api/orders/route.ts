@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
 
     // Status filter
     if (status !== 'all') {
-      filtered = filtered.filter(o => o.status === status);
+      filtered = filtered.filter(o => o.status.toLowerCase() === status.toLowerCase());
     }
 
     // Sort

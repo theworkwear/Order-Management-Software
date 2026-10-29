@@ -42,6 +42,8 @@ export default function OrderDetailPage() {
   const [driveImagesLoading, setDriveImagesLoading] = useState(false);
   const [selectedImage, setSelectedImage] = useState<any | null>(null);
   const [isLandscapeModalOpen, setIsLandscapeModalOpen] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   // Editable fields
   const [editFields, setEditFields] = useState({
@@ -210,6 +212,38 @@ export default function OrderDetailPage() {
       setError(err.message);
     } finally {
       setStatusChanging(false);
+    }
+  };
+
+  const handleDeleteOrder = async () => {
+    if (!order) return;
+    setDeleting(true);
+    setError('');
+    setSuccessMsg('');
+
+    try {
+      const res = await fetch(`/api/orders/${encodeURIComponent(orderId)}`, {
+        method: 'DELETE',
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to delete order');
+      }
+
+      addActivityLog({
+        orderNumber: order.orderNumber,
+        action: 'Order Deleted',
+        details: `Order #${order.orderNumber} deleted permanently from Google Sheets`,
+        user: session?.user?.email || 'Admin',
+        type: 'deleted',
+      });
+
+      setShowDeleteModal(false);
+      router.push('/orders');
+    } catch (err: any) {
+      setError(err.message);
+      setDeleting(false);
     }
   };
 
@@ -428,7 +462,7 @@ export default function OrderDetailPage() {
 
         </div>
 
-        {/* Status Dropdown */}
+        {/* Status Dropdown & Actions */}
         <div className="flex items-center gap-3">
           <div className="relative">
             <select
@@ -439,6 +473,7 @@ export default function OrderDetailPage() {
                 order.status === 'Pending' ? 'border-amber-300 bg-amber-50 text-amber-800' :
                 order.status === 'Being Made' ? 'border-yellow-300 bg-yellow-50 text-yellow-800' :
                 order.status === 'Digitized' ? 'border-purple-300 bg-purple-50 text-purple-800' :
+                order.status === 'Cancelled' ? 'border-red-300 bg-red-50 text-red-800' :
                 'border-green-300 bg-green-50 text-green-800'
               }`}
             >
@@ -451,6 +486,18 @@ export default function OrderDetailPage() {
               <Loader2 className="absolute right-8 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin" />
             )}
           </div>
+
+          {!isDigitizer && (
+            <button
+              onClick={() => setShowDeleteModal(true)}
+              disabled={deleting}
+              className="inline-flex items-center gap-2 px-3.5 py-2.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl text-sm font-medium transition-colors border border-red-200"
+              title="Delete Order"
+            >
+              <Trash2 className="w-4 h-4" />
+              <span className="hidden sm:inline">Delete Order</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -935,6 +982,43 @@ export default function OrderDetailPage() {
           isOpen={isLandscapeModalOpen}
           onClose={() => setIsLandscapeModalOpen(false)}
         />
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && order && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-slate-100 p-6 space-y-4 fade-in">
+            <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto">
+              <Trash2 className="w-6 h-6" />
+            </div>
+            <div className="text-center">
+              <h3 className="text-lg font-bold text-slate-900">Delete Order #{order.orderNumber}?</h3>
+              <p className="text-sm text-slate-500 mt-2">
+                Are you sure you want to permanently delete this order for{' '}
+                <span className="font-semibold text-slate-700">{order.customerName || 'Customer'}</span>? This will remove the order permanently from Google Sheets and cannot be undone.
+              </p>
+            </div>
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowDeleteModal(false)}
+                disabled={deleting}
+                className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 text-sm font-medium transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteOrder}
+                disabled={deleting}
+                className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-semibold shadow-sm transition-colors flex items-center gap-2"
+              >
+                {deleting && <Loader2 className="w-4 h-4 animate-spin" />}
+                {deleting ? 'Deleting...' : 'Delete Order'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

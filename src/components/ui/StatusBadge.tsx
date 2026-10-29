@@ -15,6 +15,7 @@ export default function StatusBadge({ status, size = 'md' }: StatusBadgeProps) {
     'Being Made': 'status-being-made',
     'Digitized': 'status-digitized',
     'Done': 'status-done',
+    'Cancelled': 'status-cancelled',
   }[status] || 'status-pending';
 
   return (
@@ -27,7 +28,8 @@ export default function StatusBadge({ status, size = 'md' }: StatusBadgeProps) {
         status === 'Pending' ? 'bg-amber-500' :
         status === 'Being Made' ? 'bg-yellow-500' :
         status === 'Digitized' ? 'bg-purple-500' :
-        'bg-green-500'
+        status === 'Done' ? 'bg-green-500' :
+        'bg-red-500'
       }`} />
       {config.label}
     </span>

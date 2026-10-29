@@ -1,10 +1,10 @@
 // ============================================
-// Single Order API — GET/PATCH
+// Single Order API — GET/PATCH/DELETE
 // ============================================
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
-import { fetchAllOrders, updateOrderStatus, updateOrderFields, batchUpdateCells } from '@/lib/google/sheets';
+import { fetchAllOrders, updateOrderStatus, updateOrderFields, batchUpdateCells, deleteOrderRow } from '@/lib/google/sheets';
 import { OrderStatus, COLUMN_MAP, getProductColumnIndex } from '@/lib/types/order';
 
 export async function GET(
@@ -64,10 +64,17 @@ export async function PATCH(
 
     // Handle status change
     if (body.status && body.status !== order.status) {
-      updates.push({ row: order.rowIndex, col: COLUMN_MAP.status, value: body.status });
+      let cleanStatus = body.status;
+      if (/^cancelled$/i.test(body.status)) cleanStatus = 'Cancelled';
+      else if (/^digitized$/i.test(body.status)) cleanStatus = 'Digitized';
+      else if (/^being made$/i.test(body.status)) cleanStatus = 'Being Made';
+      else if (/^done$/i.test(body.status)) cleanStatus = 'Done';
+      else if (/^pending$/i.test(body.status)) cleanStatus = 'Pending';
+
+      updates.push({ row: order.rowIndex, col: COLUMN_MAP.status, value: cleanStatus });
       
       // If status is "Digitized", update Processed At
-      if (body.status === 'Digitized') {
+      if (cleanStatus === 'Digitized') {
         isDigitizedEvent = true;
         const now = new Date().toLocaleString('en-AU', {
           year: 'numeric', month: '2-digit', day: '2-digit',
@@ -175,6 +182,47 @@ export async function PATCH(
       { error: 'Failed to update order. Changes could not be saved.' },
       { status: 500 }
     );
+  }
+}
 
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const userRole = (session as any)?.role || (session?.user as any)?.role || 'admin';
+    if (userRole === 'digitizer') {
+      return NextResponse.json({ error: 'Forbidden: Digitizers cannot delete orders' }, { status: 403 });
+    }
+
+    const accessToken = (session as any)?.accessToken;
+    const { id } = await params;
+    const spreadsheetId = process.env.GOOGLE_SPREADSHEET_ID!;
+    const sheetName = process.env.GOOGLE_SHEET_NAME || 'Sheet1';
+
+    // First find the order to locate its spreadsheet row
+    const orders = await fetchAllOrders(accessToken, spreadsheetId, sheetName);
+    const order = orders.find(o => o.orderNumber === id || o.rowIndex.toString() === id);
+
+    if (!order) {
+      return NextResponse.json({ error: 'Order not found' }, { status: 404 });
+    }
+
+    // Delete row from Google Sheets
+    await deleteOrderRow(accessToken, spreadsheetId, sheetName, order.rowIndex);
+
+    return NextResponse.json({
+      message: `Order #${order.orderNumber} deleted successfully`,
+      orderNumber: order.orderNumber,
+    });
+  } catch (error: any) {
+    console.error('Order DELETE error:', error);
+    return NextResponse.json(
+      { error: error.message || 'Failed to delete order from Google Sheets' },
+      { status: 500 }
+    );
   }
 }
